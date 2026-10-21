@@ -6,6 +6,13 @@ data class ProviderInfo(
     /** ARGB, bv. 0xFF00D1A7 */
     val brandColor: Long,
     val requiresLogin: Boolean = true,
+    /**
+     * True = het platform houdt zelf kijkvoortgang bij en de plugin implementeert
+     * [StreamingProvider.continueWatching] en [StreamingProvider.reportProgress].
+     * De host gebruikt dan de gegevens van het platform als bron van waarheid voor
+     * "Verder kijken" en bekeken afleveringen.
+     */
+    val syncsProgress: Boolean = false,
 )
 
 data class Credentials(val username: String, val password: String)
@@ -63,6 +70,27 @@ data class Episode(
     val seasonNumber: Int? = null,
     val episodeNumber: Int? = null,
     val available: Boolean = true,
+    /** Kijkvoortgang volgens het platform; null = niet bekeken of niet ondersteund. */
+    val progress: WatchProgress? = null,
+)
+
+/** Kijkvoortgang zoals het platform die bijhoudt. */
+data class WatchProgress(
+    val positionSeconds: Int,
+    val durationSeconds: Int,
+    /** Het platform beschouwt de aflevering als uitgekeken. */
+    val completed: Boolean = false,
+)
+
+/**
+ * Eén item uit de eigen "Verder kijken"-lijst van het platform. Een aflevering zonder
+ * [Episode.progress] is de volgende aflevering die het platform voorstelt.
+ */
+data class ContinueWatchingEntry(
+    /** Id van de reeks of film zoals in [CatalogItem.id]; null als het platform dat niet geeft. */
+    val itemId: String?,
+    val itemTitle: String,
+    val episode: Episode,
 )
 
 enum class StreamFormat { DASH, HLS, PROGRESSIVE }
@@ -87,6 +115,8 @@ data class StreamInfo(
     val requestHeaders: Map<String, String> = emptyMap(),
     val subtitles: List<Subtitle> = emptyList(),
     val isLive: Boolean = false,
+    /** Waar het platform zegt dat je gebleven was; null = van het begin of onbekend. */
+    val resumePositionSeconds: Int? = null,
     /** Vrije context die de plugin terugkrijgt in [StreamingProvider.acquireLicense]. */
     val extra: Map<String, String> = emptyMap(),
 )

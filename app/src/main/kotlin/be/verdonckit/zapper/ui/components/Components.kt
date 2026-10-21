@@ -85,6 +85,9 @@ fun brandGradient(brand: Color): Brush = Brush.linearGradient(
     1f to lerp(brand, ZapperColors.Background, 0.85f),
 )
 
+/** Label linksboven op een kaart, bv. "✓ Bekeken" of "Volgende". */
+data class CardBadge(val text: String, val color: Color)
+
 /** 16:9-kaart zoals in Netflix-rijen: beeld, provider-badge, voortgangsbalk. */
 @Composable
 fun ContentCard(
@@ -98,6 +101,8 @@ fun ContentCard(
     onFocus: () -> Unit,
     modifier: Modifier = Modifier,
     width: Dp = 260.dp,
+    badge: CardBadge? = null,
+    progressColor: Color = ZapperColors.Accent,
 ) {
     val hasCandidates = imageUrls.any { !it.isNullOrBlank() }
     var imageFailed by remember(imageUrls) { mutableStateOf(!hasCandidates) }
@@ -105,7 +110,7 @@ fun ContentCard(
     Card(
         onClick = onClick,
         modifier = modifier
-            .width(width)
+            .then(if (width > 0.dp) Modifier.width(width) else Modifier.fillMaxWidth())
             .aspectRatio(16f / 9f)
             .onFocusChanged { if (it.isFocused) onFocus() },
         shape = CardDefaults.shape(RoundedCornerShape(6.dp)),
@@ -175,9 +180,22 @@ fun ContentCard(
                         .padding(horizontal = 6.dp, vertical = 2.dp),
                 )
             }
+            if (badge != null) {
+                Text(
+                    text = badge.text,
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                    color = Color.White,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(6.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(badge.color)
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                )
+            }
             if (progress != null) {
                 Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(4.dp).background(Color(0x66FFFFFF))) {
-                    Box(Modifier.fillMaxHeight().fillMaxWidth(progress.coerceIn(0f, 1f)).background(ZapperColors.Accent))
+                    Box(Modifier.fillMaxHeight().fillMaxWidth(progress.coerceIn(0f, 1f)).background(progressColor))
                 }
             }
         }

@@ -11,8 +11,11 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import be.verdonckit.zapper.data.ItemEntity
 import be.verdonckit.zapper.player.PlayerActivity
+import be.verdonckit.zapper.graph
 import be.verdonckit.zapper.ui.detail.DetailScreen
+import be.verdonckit.zapper.ui.detail.EpisodeScreen
 import be.verdonckit.zapper.ui.home.HomeScreen
+import be.verdonckit.zapper.ui.search.SearchScreen
 import be.verdonckit.zapper.ui.settings.SettingsScreen
 import be.verdonckit.zapper.ui.theme.ZapperColors
 
@@ -36,11 +39,25 @@ fun AppNav() {
         modifier = Modifier.fillMaxSize().background(ZapperColors.Background),
     ) {
         composable("home") {
-            HomeScreen(onOpen = ::open, onSettings = { nav.navigate("settings") })
+            HomeScreen(onOpen = ::open, onSearch = { nav.navigate("search") }, onSettings = { nav.navigate("settings") })
         }
         composable("detail/{key}") { entry ->
-            DetailScreen(itemKey = Uri.decode(entry.arguments?.getString("key").orEmpty()))
+            DetailScreen(
+                itemKey = Uri.decode(entry.arguments?.getString("key").orEmpty()),
+                onOpenEpisode = { itemKey, episode ->
+                    context.graph.episodeSelection["$itemKey|${episode.playableId}"] = episode
+                    nav.navigate("episode/${Uri.encode(itemKey)}/${Uri.encode(episode.playableId)}")
+                },
+            )
         }
+        composable("episode/{key}/{playable}") { entry ->
+            EpisodeScreen(
+                itemKey = Uri.decode(entry.arguments?.getString("key").orEmpty()),
+                playableId = Uri.decode(entry.arguments?.getString("playable").orEmpty()),
+                onGone = { nav.popBackStack() },
+            )
+        }
+        composable("search") { SearchScreen(onOpen = ::open) }
         composable("settings") { SettingsScreen() }
     }
 }

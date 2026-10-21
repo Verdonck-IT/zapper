@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -26,9 +27,11 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.tv.material3.Button
+import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import be.verdonckit.zapper.data.ItemEntity
@@ -41,7 +44,7 @@ import be.verdonckit.zapper.ui.theme.ZapperColors
 import androidx.compose.ui.graphics.Color
 
 @Composable
-fun HomeScreen(onOpen: (ItemEntity) -> Unit, onSettings: () -> Unit) {
+fun HomeScreen(onOpen: (ItemEntity) -> Unit, onSearch: () -> Unit, onSettings: () -> Unit) {
     val context = LocalContext.current
     val vm: HomeViewModel = viewModel { HomeViewModel(context.graph) }
     val state by vm.state.collectAsStateWithLifecycle()
@@ -51,12 +54,14 @@ fun HomeScreen(onOpen: (ItemEntity) -> Unit, onSettings: () -> Unit) {
     val hero = focused ?: state.rows.firstOrNull()?.tiles?.firstOrNull()
 
     fun activate(tile: Tile) {
-        val resume = tile.resume
+        // Ook "Verder kijken" opent eerst het programma (met de volgende aflevering klaar);
+        // enkel als het programma niet in de index zit, spelen we meteen af.
+        val play = tile.play
         when {
-            resume != null -> context.startActivity(
-                PlayerActivity.intent(context, resume.providerId, resume.playableId, resume.title, resume.itemKey, resume.imageUrl),
-            )
             tile.item != null -> onOpen(tile.item)
+            play != null -> context.startActivity(
+                PlayerActivity.intent(context, play.providerId, play.playableId, play.title, play.itemKey, play.imageUrl),
+            )
         }
     }
 
@@ -70,7 +75,9 @@ fun HomeScreen(onOpen: (ItemEntity) -> Unit, onSettings: () -> Unit) {
             ) {
                 Text("ZAPPER", style = MaterialTheme.typography.headlineSmall, color = ZapperColors.Accent)
                 Spacer(Modifier.weight(1f))
-                Button(onClick = onSettings) { Text("Instellingen") }
+                Button(onClick = onSearch) { Text("Zoeken") }
+                Spacer(Modifier.width(12.dp))
+                OutlinedButton(onClick = onSettings) { Text("Instellingen") }
             }
 
             if (hero != null) {
@@ -123,6 +130,11 @@ fun HomeScreen(onOpen: (ItemEntity) -> Unit, onSettings: () -> Unit) {
                 }
             }
         }
+    }
+
+    LifecycleResumeEffect(Unit) {
+        vm.refreshContinue()
+        onPauseOrDispose { }
     }
 
     LaunchedEffect(state.rows.isNotEmpty()) {

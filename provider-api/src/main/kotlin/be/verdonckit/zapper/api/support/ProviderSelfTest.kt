@@ -53,6 +53,13 @@ object ProviderSelfTest {
             Unit to "sessie geldig"
         } ?: return SelfTestResult(id, steps)
 
+        if (provider.info.syncsProgress) {
+            step("continue") {
+                val list = provider.continueWatching()
+                Unit to "${list.size} item(s) in verder kijken"
+            } ?: return SelfTestResult(id, steps)
+        }
+
         val category = provider.nativeCategories().firstOrNull { it.id != "live" }?.id
         val items = step("catalog") {
             val page = provider.catalog(category, null)

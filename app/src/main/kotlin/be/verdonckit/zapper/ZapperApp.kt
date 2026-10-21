@@ -7,6 +7,7 @@ import be.verdonckit.zapper.core.OkHttpHostHttp
 import be.verdonckit.zapper.core.SecureStore
 import be.verdonckit.zapper.data.CatalogRepository
 import be.verdonckit.zapper.data.CategoryMapper
+import be.verdonckit.zapper.data.ProgressSync
 import be.verdonckit.zapper.data.ZapperDatabase
 import be.verdonckit.zapper.plugin.PluginManager
 import be.verdonckit.zapper.sync.MaintenanceWorker
@@ -41,6 +42,10 @@ class AppGraph(app: Application) {
     }
 
     val repository = CatalogRepository(dao, categoryMapper)
+    val progressSync = ProgressSync(dao, plugins)
+
+    /** Aflevering die van de reeks naar de afleveringspagina doorgegeven wordt (sleutel: "<itemKey>|<playableId>"). */
+    val episodeSelection = java.util.concurrent.ConcurrentHashMap<String, be.verdonckit.zapper.api.Episode>()
     val appUpdater = AppUpdater(app, okHttp)
     val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 }
@@ -54,6 +59,7 @@ class ZapperApp : Application() {
         graph = AppGraph(this)
         graph.scope.launch {
             graph.plugins.loadInstalled()
+            graph.progressSync.refresh(force = true)
             // Eerste start of lege index: meteen updaten + syncen, daarna periodiek.
             MaintenanceWorker.runNow(this@ZapperApp, onlyIfStale = true)
         }

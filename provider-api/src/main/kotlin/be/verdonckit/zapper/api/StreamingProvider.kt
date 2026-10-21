@@ -4,7 +4,7 @@ package be.verdonckit.zapper.api
  * Versie van het plugin-contract. Verhoog dit bij elke breaking change in deze module.
  * De host laadt enkel plugins waarvan `apiVersion` in het manifest exact gelijk is.
  */
-const val PROVIDER_API_VERSION = 1
+const val PROVIDER_API_VERSION = 2
 
 /**
  * Eén streamingplatform (VRT MAX, VTM GO, ...).
@@ -49,6 +49,19 @@ interface StreamingProvider {
      * Widevine-challenge en geeft het licentieantwoord terug (bv. als het platform
      * de challenge in JSON verpakt). Standaard handelt de host het af via een POST.
      */
+    /**
+     * De eigen "Verder kijken"-lijst van het platform, in de volgorde van het platform.
+     * Enkel nodig als [ProviderInfo.syncsProgress] true is.
+     */
+    suspend fun continueWatching(): List<ContinueWatchingEntry> = emptyList()
+
+    /**
+     * Meldt kijkvoortgang aan het platform, zodat die ook in de eigen app of website
+     * zichtbaar is. De host roept dit periodiek tijdens het kijken en bij het stoppen aan.
+     * [stream] is de [StreamInfo] uit [resolveStream] (incl. [StreamInfo.extra]).
+     */
+    suspend fun reportProgress(stream: StreamInfo, playableId: String, positionSeconds: Int, durationSeconds: Int) {}
+
     suspend fun acquireLicense(stream: StreamInfo, challenge: ByteArray): ByteArray =
         throw UnsupportedOperationException("${info.id} handelt licenties niet zelf af")
 }

@@ -1,6 +1,7 @@
 package be.verdonckit.zapper.data
 
 import android.content.Context
+import androidx.room.AutoMigration
 import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Entity
@@ -57,6 +58,30 @@ data class ProgressEntity(
     val updatedAt: Long,
 )
 
+/**
+ * Eén item uit de eigen "Verder kijken"-lijst van een platform ([be.verdonckit.zapper.api.StreamingProvider.continueWatching]).
+ * Wordt per provider volledig vervangen bij elke verversing.
+ */
+@Entity(tableName = "remote_continue", primaryKeys = ["playableKey"], indices = [Index("providerId"), Index("itemKey")])
+data class RemoteContinueEntity(
+    /** "<providerId>:<playableId>" */
+    val playableKey: String,
+    val providerId: String,
+    val playableId: String,
+    val itemKey: String?,
+    val itemTitle: String,
+    val episodeTitle: String,
+    val imageUrl: String?,
+    val seasonNumber: Int?,
+    val episodeNumber: Int?,
+    /** 0 = nog niet begonnen (volgende aflevering die het platform voorstelt). */
+    val positionMs: Long,
+    val durationMs: Long,
+    /** Volgorde van het platform. */
+    val sortOrder: Int,
+    val fetchedAt: Long,
+)
+
 @Dao
 interface CatalogDao {
 
@@ -90,6 +115,13 @@ interface CatalogDao {
 
     @Query("SELECT * FROM items WHERE title LIKE '%' || :q || '%' GROUP BY dedupKey ORDER BY rank LIMIT 60")
     fun search(q: String): Flow<List<ItemEntity>>
+
+    /** Alles voor het zoekscherm; ontdubbelen en filteren gebeurt in het geheugen (enkele duizenden rijen). */
+    @Query("SELECT * FROM items ORDER BY title")
+    fun allItems(): Flow<List<ItemEntity>>
+
+    @Query("SELECT * FROM item_categories")
+    fun allItemCategories(): Flow<List<ItemCategoryEntity>>
 
     @Query("SELECT COUNT(*) FROM items")
     suspend fun count(): Int
@@ -126,6 +158,12 @@ interface CatalogDao {
     @Query("SELECT * FROM progress WHERE providerId = :providerId AND playableId IN (:playableIds)")
     suspend fun progressFor(providerId: String, playableIds: List<String>): List<ProgressEntity>
 
+    @Query("SELECT * FROM progress WHERE itemKey = :itemKey")
+    suspend fun progressForItem(itemKey: String): List<ProgressEntity>
+
+    @Query("SELECT * FROM progress WHERE updatedAt > :since ORDER BY updatedAt DESC")
+    fun recentProgress(since: Long): Flow<List<ProgressEntity>>
+
     @Query(
         """
         SELECT * FROM progress
@@ -134,12 +172,33 @@ interface CatalogDao {
         """,
     )
     fun continueWatching(): Flow<List<ProgressEntity>>
+
+    // ---- "verder kijken" van de platformen ----
+
+    @Query("SELECT * FROM remote_continue ORDER BY sortOrder")
+    fun remoteContinue(): Flow<List<RemoteContinueEntity>>
+
+    @Query("SELECT * FROM remote_continue WHERE itemKey = :itemKey ORDER BY sortOrder")
+    suspend fun remoteContinueForItem(itemKey: String): List<RemoteContinueEntity>
+
+    @Query("DELETE FROM remote_continue WHERE providerId = :providerId")
+    suspend fun deleteRemoteContinue(providerId: String)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertRemoteContinue(entries: List<RemoteContinueEntity>)
+
+    @Transaction
+    suspend fun replaceRemoteContinue(providerId: String, entries: List<RemoteContinueEntity>) {
+        deleteRemoteContinue(providerId)
+        insertRemoteContinue(entries)
+    }
 }
 
 @Database(
-    entities = [ItemEntity::class, ItemCategoryEntity::class, ProgressEntity::class],
-    version = 2,
+    entities = [ItemEntity::class, ItemCategoryEntity::class, ProgressEntity::class, RemoteContinueEntity::class],
+    version = 3,
     exportSchema = true,
+    autoMigrations = [AutoMigration(from = 2, to = 3)],
 )
 abstract class ZapperDatabase : RoomDatabase() {
     abstract fun catalog(): CatalogDao

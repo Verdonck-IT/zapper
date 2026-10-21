@@ -32,7 +32,8 @@ internal object VrtQueries {
           image { templateUrl }
           action { ... on LinkAction { link } }
           primaryMeta { type value shortValue longValue }
-          progress { durationInSeconds }
+          progress { durationInSeconds progressInSeconds completed }
+          preview { heading { ... on Banner { title } } }
         }
     """
 
@@ -99,7 +100,13 @@ internal object VrtQueries {
           page(id: ${'$'}pageId) {
             __typename
             ... on EpisodePage {
-              player { modes { __typename ... on VideoPlayerMode { streamId } } }
+              player {
+                progress { durationInSeconds progressInSeconds completed }
+                modes {
+                  __typename
+                  ... on VideoPlayerMode { streamId resumePointTemplate { mediaId mediaName } }
+                }
+              }
             }
             ... on LivestreamPage {
               player { modes { __typename ... on VideoPlayerMode { streamId } } }
