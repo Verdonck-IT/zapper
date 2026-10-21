@@ -16,11 +16,14 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
@@ -36,7 +39,9 @@ import androidx.tv.material3.Text
 import be.verdonckit.zapper.api.Episode
 import be.verdonckit.zapper.graph
 import be.verdonckit.zapper.player.PlayerActivity
+import be.verdonckit.zapper.ui.components.BackToTop
 import be.verdonckit.zapper.ui.components.CardBadge
+import be.verdonckit.zapper.ui.components.requestFocusAfterLayout
 import be.verdonckit.zapper.ui.components.ContentCard
 import be.verdonckit.zapper.ui.components.HeroBackdrop
 import be.verdonckit.zapper.ui.components.HeroInfo
@@ -44,7 +49,7 @@ import be.verdonckit.zapper.ui.home.HomeViewModel
 import be.verdonckit.zapper.ui.theme.ZapperColors
 
 @Composable
-fun DetailScreen(itemKey: String, onOpenEpisode: (itemKey: String, episode: Episode) -> Unit) {
+fun DetailScreen(itemKey: String, onOpenEpisode: (itemKey: String, episode: Episode) -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
     val vm: DetailViewModel = viewModel(key = itemKey) { DetailViewModel(context.graph, itemKey) }
     val state by vm.state.collectAsStateWithLifecycle()
@@ -52,6 +57,14 @@ fun DetailScreen(itemKey: String, onOpenEpisode: (itemKey: String, episode: Epis
     val playFocus = remember { FocusRequester() }
     val episodeRow = rememberLazyListState()
     val item = state.item
+    var playFocused by remember { mutableStateOf(false) }
+
+    // Terug vanuit seizoenen/afleveringen: eerst naar de afspeelknop, dan pas naar het vorige scherm.
+    BackToTop(
+        atTop = { playFocused || state.item == null },
+        toTop = { playFocus.requestFocusAfterLayout() },
+        onBackAtTop = onBack,
+    )
 
     fun play(playableId: String, title: String, image: String?) {
         val i = item ?: return
@@ -85,7 +98,7 @@ fun DetailScreen(itemKey: String, onOpenEpisode: (itemKey: String, episode: Epis
                 Button(
                     onClick = { target?.let { play(it.first, it.second, next?.episode?.imageUrl) } },
                     enabled = target != null,
-                    modifier = Modifier.focusRequester(playFocus),
+                    modifier = Modifier.focusRequester(playFocus).onFocusChanged { playFocused = it.isFocused },
                 ) { Text(label) }
 
                 // Zelfde titel bij een andere zender? Laat kiezen waar je kijkt.

@@ -16,6 +16,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import be.verdonckit.zapper.ui.components.BackToTop
+import be.verdonckit.zapper.ui.components.requestFocusAfterLayout
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -44,15 +50,29 @@ import be.verdonckit.zapper.graph
 import be.verdonckit.zapper.ui.theme.ZapperColors
 
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val vm: SettingsViewModel = viewModel {
         SettingsViewModel(context.applicationContext as Application, context.graph)
     }
     val state by vm.state.collectAsStateWithLifecycle()
     var loginFor by rememberSaveable { mutableStateOf<String?>(null) }
+    val listState = rememberLazyListState()
+    val firstButton = remember { FocusRequester() }
+    var firstFocused by remember { mutableStateOf(false) }
+
+    // Terug: eerst naar boven (eerste knop), dan pas naar het startscherm.
+    BackToTop(
+        atTop = { firstFocused },
+        toTop = {
+            listState.scrollToItem(0)
+            firstButton.requestFocusAfterLayout()
+        },
+        onBackAtTop = onBack,
+    )
 
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(56.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
@@ -62,7 +82,11 @@ fun SettingsScreen() {
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(onClick = vm::syncNow, enabled = !state.busy) { Text("Catalogus nu syncen") }
+                Button(
+                    onClick = vm::syncNow,
+                    enabled = !state.busy,
+                    modifier = Modifier.focusRequester(firstButton).onFocusChanged { firstFocused = it.isFocused },
+                ) { Text("Catalogus nu syncen") }
                 OutlinedButton(onClick = vm::updatePlugins, enabled = !state.busy) { Text("Plugins bijwerken") }
                 OutlinedButton(onClick = vm::checkAppUpdate, enabled = !state.busy) { Text("App-update zoeken") }
             }

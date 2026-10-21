@@ -50,7 +50,9 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import be.verdonckit.zapper.data.ItemEntity
 import be.verdonckit.zapper.graph
+import be.verdonckit.zapper.ui.components.BackToTop
 import be.verdonckit.zapper.ui.components.ContentCard
+import be.verdonckit.zapper.ui.components.requestFocusAfterLayout
 import be.verdonckit.zapper.ui.theme.ZapperColors
 
 /**
@@ -60,7 +62,7 @@ import be.verdonckit.zapper.ui.theme.ZapperColors
  * - raster met alle titels A–Z, of gerangschikt op relevantie zodra je typt.
  */
 @Composable
-fun SearchScreen(onOpen: (ItemEntity) -> Unit) {
+fun SearchScreen(onOpen: (ItemEntity) -> Unit, onBack: () -> Unit) {
     val context = LocalContext.current
     val vm: SearchViewModel = viewModel { SearchViewModel(context.graph) }
     val state by vm.state.collectAsStateWithLifecycle()
@@ -68,6 +70,17 @@ fun SearchScreen(onOpen: (ItemEntity) -> Unit) {
     val focusManager = LocalFocusManager.current
     val grid = rememberLazyGridState()
     var focused by remember { mutableStateOf<ItemEntity?>(null) }
+    var fieldFocused by remember { mutableStateOf(false) }
+
+    // Terug in de resultaten: eerst naar boven en in de zoekbalk, dan pas terug naar het startscherm.
+    BackToTop(
+        atTop = { fieldFocused },
+        toTop = {
+            grid.scrollToItem(0)
+            fieldFocus.requestFocusAfterLayout()
+        },
+        onBackAtTop = onBack,
+    )
 
     // Nieuwe zoekterm of filter: terug naar boven.
     LaunchedEffect(state.query, state.category) { grid.scrollToItem(0) }
@@ -78,6 +91,7 @@ fun SearchScreen(onOpen: (ItemEntity) -> Unit) {
             onValueChange = vm::setQuery,
             onSearch = { focusManager.moveFocus(FocusDirection.Down) },
             focusRequester = fieldFocus,
+            onFocusChange = { fieldFocused = it },
         )
 
         Spacer(Modifier.height(16.dp))
@@ -142,7 +156,13 @@ fun SearchScreen(onOpen: (ItemEntity) -> Unit) {
 }
 
 @Composable
-private fun SearchField(value: String, onValueChange: (String) -> Unit, onSearch: () -> Unit, focusRequester: FocusRequester) {
+private fun SearchField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    onSearch: () -> Unit,
+    focusRequester: FocusRequester,
+    onFocusChange: (Boolean) -> Unit,
+) {
     var hasFocus by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(8.dp)
     Box(
@@ -163,7 +183,7 @@ private fun SearchField(value: String, onValueChange: (String) -> Unit, onSearch
             cursorBrush = SolidColor(ZapperColors.Accent),
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = { onSearch() }),
-            modifier = Modifier.fillMaxWidth().focusRequester(focusRequester).onFocusChanged { hasFocus = it.isFocused },
+            modifier = Modifier.fillMaxWidth().focusRequester(focusRequester).onFocusChanged { hasFocus = it.isFocused; onFocusChange(it.isFocused) },
         )
     }
 }
