@@ -1,0 +1,122 @@
+name: Nachtelijke health-check
+
+# Draait op een self-hosted runner thuis (Belgisch IP: geen geoblocking en
+# geen datacenter-IP dat loginflows als bot behandelen).
+# Label de runner bij registratie met: zapper-be
+on:
+  schedule:
+    - cron: "17 3 * * *" # 05:17 Belgische zomertijd
+  workflow_dispatch:
+
+jobs:
+  health:
+    runs-on: [self-hosted, zapper-be]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - plugin: vrtmax
+            env: VRTMAX
+          # Nieuwe provider? Voeg hier een regel toe + de secrets <ENV>_USERNAME/_PASSWORD.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Contracttest ${{ matrix.plugin }}
+        env:
+          # Env-namen kunnen geen expressies bevatten; daarom via U/P geëxporteerd.
+          U: ${{ secrets[format('{0}_USERNAME', matrix.env)] }}
+          P: ${{ secrets[format('{0}_PASSWORD', matrix.env)] }}
+        run: |
+          export ${{ matrix.env }}_USERNAME="$U" ${{ matrix.env }}_PASSWORD="$P"
+          ./gradlew :plugins:${{ matrix.plugin }}:test --tests '*ContractTest*' --rerun-tasks
+
+      - name: Rapport bewaren
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: health-${{ matrix.plugin }}
+          path: plugins/${{ matrix.plugin }}/build/health/*.json
+          if-no-files-found: warn
+
+  fix:
+    needs: health
+    if: failure()
+    runs-on: [self-hosted, zapper-be]
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+
+      - uses: actions/download-artifact@v4
+        with: { path: .agent/health, pattern: "health-*", merge-multiple: true }
+
+      - name: Falende plugins bepalen
+        id: failing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          failing=""
+          for f in .agent/health/*.json; do
+            id=$(basename "$f" .json)
+            if ! jq -e '.ok' "$f" > /dev/null; then
+              # Al een open auto-fix PR? Dan niet nog een starten.
+              if [ -n "$(gh pr list --label auto-fix --search "$id in:title" --json number --jq '.[].number')" ]; then
+                echo "$id: er staat al een auto-fix PR open, overslaan"
+              else
+                failing="$failing $id"
+              fi
+            fi
+          done
+          echo "list=$(echo $failing | xargs)" >> "$GITHUB_OUTPUT"
+          echo "Falend: ${failing:-geen}"
+
+      - name: Webflow opnemen (HAR)
+        if: steps.failing.outputs.list != ''
+        continue-on-error: true
+        env:
+          CHROME_CHANNEL: ${{ vars.CHROME_CHANNEL }}
+          VRTMAX_USERNAME: ${{ secrets.VRTMAX_USERNAME }}
+          VRTMAX_PASSWORD: ${{ secrets.VRTMAX_PASSWORD }}
+        run: |
+          cd tools/har-capture
+          npm install --no-audit --no-fund
+          npx playwright install chromium
+          mkdir -p ../../.agent/har
+          for id in ${{ steps.failing.outputs.list }}; do
+            node capture.mjs "$id" "../../.agent/har/$id.har" || echo "$id: opname mislukt"
+          done
+
+      - name: Fix-agent
+        if: steps.failing.outputs.list != ''
+        uses: anthropics/claude-code-action@v1
+        env:
+          # Nodig om de contracttest na de fix opnieuw te draaien.
+          VRTMAX_USERNAME: ${{ secrets.VRTMAX_USERNAME }}
+          VRTMAX_PASSWORD: ${{ secrets.VRTMAX_PASSWORD }}
+          GH_TOKEN: ${{ github.token }}
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Falende plugins: ${{ steps.failing.outputs.list }}
+            Health-rapporten: .agent/health/<id>.json
+            Geschoonde opname van de echte webflow: .agent/har/<id>.har (kan ontbreken)
+            Upstream-referentie: zie .github/agent/upstream.json
+
+            Volg de werkwijze in .github/agent/fix-plugin.md.
+          claude_args: |
+            --max-turns 80
+            --allowedTools "Read,Edit,Write,Glob,Grep,WebFetch,Bash(./gradlew:*),Bash(git:*),Bash(gh pr:*),Bash(jq:*),Bash(git clone:*)"
+
+      - name: Opruimen
+        if: always()
+        run: rm -rf .agent

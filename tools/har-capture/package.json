@@ -1,0 +1,13 @@
+{
+  "name": "zapper-har-capture",
+  "private": true,
+  "type": "module",
+  "description": "Neemt de echte webflow van een streamingplatform op als (geschoonde) HAR voor de fix-agent.",
+  "scripts": {
+    "capture": "node capture.mjs",
+    "sanitize": "node sanitize.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.49.0"
+  }
+}

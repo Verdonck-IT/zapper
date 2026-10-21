@@ -1,0 +1,16 @@
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+.DS_Store
+captures/
+.kotlin/
+
+# Nooit committen
+*.jks
+*.keystore
+plugin-signing-key.pem
+.agent/
+*.har
+tools/har-capture/node_modules/

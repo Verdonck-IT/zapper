@@ -1,0 +1,62 @@
+name: App release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+concurrency: publish-dist
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Keystore klaarzetten
+        env:
+          KEYSTORE_B64: ${{ secrets.ZAPPER_KEYSTORE_B64 }}
+        run: echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/zapper.jks"
+
+      - name: Release-APK bouwen
+        run: >
+          ./gradlew :app:assembleRelease
+          -PzapperVersionCode=${{ github.run_number }}
+          -PzapperVersionName=0.1.${{ github.run_number }}
+          -PzapperUpdateBaseUrl=${{ vars.ZAPPER_UPDATE_BASE_URL }}
+          -PzapperPluginPublicKey=${{ vars.ZAPPER_PLUGIN_PUBLIC_KEY }}
+          -PzapperKeystore=$RUNNER_TEMP/zapper.jks
+          -PzapperKeystorePassword=${{ secrets.ZAPPER_KEYSTORE_PASSWORD }}
+          -PzapperKeyAlias=${{ secrets.ZAPPER_KEY_ALIAS }}
+          -PzapperKeyPassword=${{ secrets.ZAPPER_KEY_PASSWORD }}
+
+      - name: Dist-site uitchecken
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.DIST_REPO || github.repository }}
+          ref: gh-pages
+          token: ${{ secrets.DIST_TOKEN || github.token }}
+          path: dist
+
+      - name: APK publiceren voor auto-update
+        run: |
+          python tools/publish/publish_app.py \
+            --apk app/build/outputs/apk/release/app-release.apk \
+            --version-code ${{ github.run_number }} \
+            --version-name 0.1.${{ github.run_number }} \
+            --dist dist
+          cd dist
+          git config user.name "zapper-ci"
+          git config user.email "zapper-ci@users.noreply.github.com"
+          git add -A && git commit -m "app: 0.1.${{ github.run_number }}" && git push
+
+      - name: GitHub release (voor de eerste sideload)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || format('build-{0}', github.run_number) }}
+          files: app/build/outputs/apk/release/app-release.apk

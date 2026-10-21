@@ -1,0 +1,108 @@
+{
+  "_doc": [
+    "Eigen taxonomie, afgestemd op Vlaamse tv. Volgorde van 'categories' = volgorde van de rijen op het startscherm.",
+    "Toekennen gebeurt in deze volgorde:",
+    "  1. 'titles': vaste titels (bv. dagelijkse soaps) - wint altijd",
+    "  2. 'providers': native categorie van de zender -> eigen categorieën",
+    "  3. 'keywords': trefwoorden in titel + omschrijving (aanvullend)",
+    "  4. 'rules': opkuis, bv. true crime niet ook in fictie-crime, kids niet in volwassen rijen",
+    "  5. niets gevonden -> 'other' (Meer om te ontdekken)",
+    "'popular' komt uit de eigen populair-lijst van elke zender; de volgorde in die lijst bepaalt de positie in de rij, zodat zenders om beurten verschijnen."
+  ],
+  "categories": [
+    { "id": "popular",   "name": "Moet je nu zien" },
+    { "id": "live",      "name": "Live tv" },
+    { "id": "soaps",     "name": "Dagelijkse reeksen" },
+    { "id": "drama",     "name": "Fictie" },
+    { "id": "crime",     "name": "Crime & thriller" },
+    { "id": "comedy",    "name": "Humor & sitcoms" },
+    { "id": "games",     "name": "Spel & quiz" },
+    { "id": "reality",   "name": "Reality & dating" },
+    { "id": "docu",      "name": "Docu & human interest" },
+    { "id": "truecrime", "name": "True crime" },
+    { "id": "talk",      "name": "Talkshows & late night" },
+    { "id": "music",     "name": "Muziek & shows" },
+    { "id": "lifestyle", "name": "Koken, wonen & lifestyle" },
+    { "id": "nature",    "name": "Natuur & wetenschap" },
+    { "id": "news",      "name": "Nieuws & duiding" },
+    { "id": "sport",     "name": "Sport" },
+    { "id": "films",     "name": "Films" },
+    { "id": "kids",      "name": "Kids" },
+    { "id": "archive",   "name": "Uit het archief" },
+    { "id": "other",     "name": "Meer om te ontdekken" }
+  ],
+
+  "titles": {
+    "thuis": ["soaps"],
+    "familie": ["soaps"],
+    "lisa": ["soaps"],
+    "dagelijkse kost": ["lifestyle"],
+    "de afspraak": ["talk", "news"],
+    "terzake": ["news"],
+    "het journaal": ["news"],
+    "vtm nieuws": ["news"],
+    "de slimste mens ter wereld": ["games"],
+    "blind getrouwd": ["reality"],
+    "liefde voor muziek": ["music"]
+  },
+
+  "providers": {
+    "vrtmax": {
+      "populair": ["popular"],
+      "live": ["live"],
+      "series": ["drama"],
+      "films": ["films"],
+      "docu": ["docu"],
+      "entertainment": ["reality"],
+      "humor": ["comedy"],
+      "human-interest": ["docu"],
+      "cultuur": ["docu"],
+      "muziek": ["music"],
+      "koken": ["lifestyle"],
+      "lifestyle": ["lifestyle"],
+      "nieuws-en-actua": ["news"],
+      "talkshows": ["talk"],
+      "nostalgie": ["archive"],
+      "sport": ["sport"],
+      "voor-kinderen": ["kids"],
+      "wetenschap-en-natuur": ["nature"],
+      "levensbeschouwing": ["docu"]
+    },
+    "vtmgo": {},
+    "play": {},
+    "focuswtv": {}
+  },
+
+  "keywords": {
+    "soaps": ["dagelijkse reeks", "soap"],
+    "crime": ["moord", "rechercheur", "recherche", "speurder", "detective", "thriller", "misdaad", "commissaris", "onderzoeksrechter", "seriemoordenaar"],
+    "comedy": ["komedie", "sitcom", "sketch", "humor", "comedy", "satire"],
+    "games": ["quiz", "spelprogramma", "kandidaten strijden", "kandidaten nemen het op", "spelshow"],
+    "reality": ["realityreeks", "datingshow", "dating", "verliefd", "koppels", "op zoek naar de liefde", "realityprogramma"],
+    "docu": ["documentaire", "docureeks", "getuigenissen", "portret"],
+    "talk": ["talkshow", "late night", "praatprogramma", "gasten aan tafel"],
+    "music": ["concert", "zanger", "zangeres", "muzikanten", "festival", "optreden"],
+    "lifestyle": ["recept", "recepten", "koken", "chef", "verbouwing", "renovatie", "interieur", "tuin", "huis kopen"],
+    "nature": ["natuur", "dieren", "wetenschap", "planeet", "klimaat", "oceaan"],
+    "news": ["duiding", "actualiteit", "politiek debat"],
+    "sport": ["voetbal", "wielrennen", "koers", "sporza", "jupiler pro league", "tennis", "formule 1"],
+    "kids": ["ketnet", "voor kinderen", "kinderprogramma", "kleuters", "studio 100"],
+    "archive": ["archief", "uit de oude doos", "herbekijk"]
+  },
+
+  "rules": [
+    { "_doc": "Misdaad in een docu = true crime, niet in de fictierij",
+      "when": ["crime", "docu"], "add": ["truecrime"], "remove": ["crime"] },
+    { "_doc": "Soaps staan in hun eigen rij, niet nog eens in Fictie",
+      "when": ["soaps"], "remove": ["drama"] },
+    { "_doc": "Crime- en comedyreeksen niet dubbel in de algemene fictierij",
+      "when": ["drama", "crime"], "remove": ["drama"] },
+    { "when": ["drama", "comedy"], "remove": ["drama"] },
+    { "_doc": "Een quiz is geen reality",
+      "when": ["games", "reality"], "remove": ["reality"] },
+    { "_doc": "Kinderinhoud nooit in volwassen rijen",
+      "when": ["kids"], "keepOnly": ["kids", "live"] },
+    { "_doc": "Nieuws is geen fictie, ook al valt het woord 'moord'",
+      "when": ["news"], "remove": ["crime", "drama"] }
+  ]
+}

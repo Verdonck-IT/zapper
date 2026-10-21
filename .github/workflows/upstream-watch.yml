@@ -1,0 +1,68 @@
+name: Upstream volgen
+
+# De Kodi-add-ons fixen API-wijzigingen vaak snel. Elke dag kijken we of er
+# nieuwe commits zijn en laten we de agent beoordelen of iets overgezet moet worden.
+on:
+  schedule:
+    - cron: "41 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - name: Nieuwe upstream-commits zoeken
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p .agent/upstream
+          changed=""
+          for id in $(jq -r 'keys[]' .github/agent/upstream.json); do
+            repo=$(jq -r --arg id "$id" '.[$id].repo' .github/agent/upstream.json)
+            branch=$(gh api "repos/$repo" --jq .default_branch)
+            head=$(gh api "repos/$repo/commits/$branch" --jq .sha)
+            state=".github/agent/upstream-state/$id.sha"
+            old=$(cat "$state" 2>/dev/null || true)
+            if [ -z "$old" ]; then
+              echo "$id: eerste run, $head vastgelegd"
+              mkdir -p .github/agent/upstream-state && echo "$head" > "$state"
+            elif [ "$old" != "$head" ]; then
+              echo "$id: $old -> $head"
+              git clone --quiet "https://github.com/$repo.git" ".agent/upstream/$id"
+              git -C ".agent/upstream/$id" diff "$old" "$head" -- resources/lib > ".agent/upstream/$id.diff"
+              git -C ".agent/upstream/$id" log --oneline "$old..$head" > ".agent/upstream/$id.log"
+              echo "$head" > "$state"
+              [ -s ".agent/upstream/$id.diff" ] && changed="$changed $id"
+            fi
+          done
+          echo "changed=$(echo $changed | xargs)" >> "$GITHUB_OUTPUT"
+
+      - name: Agent beoordeelt en port
+        if: steps.check.outputs.changed != ''
+        uses: anthropics/claude-code-action@v1
+        env:
+          GH_TOKEN: ${{ github.token }}
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Upstream-wijzigingen voor: ${{ steps.check.outputs.changed }}
+            Per plugin: .agent/upstream/<id>.diff (code-diff) en .agent/upstream/<id>.log (commits).
+            Volg de werkwijze in .github/agent/port-upstream.md.
+          claude_args: |
+            --max-turns 60
+            --allowedTools "Read,Edit,Write,Glob,Grep,Bash(./gradlew:*),Bash(git:*),Bash(gh pr:*)"
+
+      - name: Upstream-status vastleggen
+        run: |
+          git checkout main 2>/dev/null || true
+          git config user.name "zapper-ci"
+          git config user.email "zapper-ci@users.noreply.github.com"
+          git add .github/agent/upstream-state
+          git diff --cached --quiet || { git commit -m "upstream: status bijgewerkt"; git push; }

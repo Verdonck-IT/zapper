@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- TV-launcher banner (16:9). Vervang gerust door een PNG van 320x180. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+    <path android:fillColor="#FF141414" android:pathData="M0,0h320v180h-320z" />
+    <path android:fillColor="#FFE50914" android:pathData="M110,50h100l-62,64h62v16h-100l62,-64h-62z" />
+</vector>
