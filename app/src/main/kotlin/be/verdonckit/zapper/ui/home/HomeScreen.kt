@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -21,19 +20,27 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.tv.material3.Button
-import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import be.verdonckit.zapper.data.ItemEntity
@@ -41,14 +48,16 @@ import be.verdonckit.zapper.graph
 import be.verdonckit.zapper.player.PlayerActivity
 import be.verdonckit.zapper.ui.components.BackToTop
 import be.verdonckit.zapper.ui.components.ContentCard
-import be.verdonckit.zapper.ui.components.requestFocusAfterLayout
 import be.verdonckit.zapper.ui.components.HeroBackdrop
 import be.verdonckit.zapper.ui.components.HeroInfo
+import be.verdonckit.zapper.ui.components.Sidebar
+import be.verdonckit.zapper.ui.components.SidebarDestination
+import be.verdonckit.zapper.ui.components.requestFocusAfterLayout
 import be.verdonckit.zapper.ui.theme.ZapperColors
-import androidx.compose.ui.graphics.Color
+import kotlinx.coroutines.launch
 
 @Composable
-fun HomeScreen(onOpen: (ItemEntity) -> Unit, onSearch: () -> Unit, onSettings: () -> Unit) {
+fun HomeScreen(onOpen: (ItemEntity) -> Unit, onNavigate: (SidebarDestination) -> Unit) {
     val context = LocalContext.current
     val vm: HomeViewModel = viewModel { HomeViewModel(context.graph) }
     val state by vm.state.collectAsStateWithLifecycle()
@@ -57,8 +66,23 @@ fun HomeScreen(onOpen: (ItemEntity) -> Unit, onSearch: () -> Unit, onSettings: (
     val listState = rememberLazyListState()
     val firstRowState = rememberLazyListState()
     var firstCardFocused by remember { mutableStateOf(false) }
+    var sidebarOpen by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+    val scope = rememberCoroutineScope()
 
-    // Terug: eerst naar de eerste kaart bovenaan; staat die al in focus, dan niets (app niet sluiten).
+    // Per kaart een FocusRequester, zodat de focus na het sluiten van het menu terugkeert waar je was.
+    val cardFocus = remember { HashMap<String, FocusRequester>() }
+    var lastFocusedCard by remember { mutableStateOf<String?>(null) }
+
+    fun closeSidebar() {
+        sidebarOpen = false
+        scope.launch {
+            val target = lastFocusedCard?.let { cardFocus[it] } ?: firstCard
+            target.requestFocusAfterLayout()
+        }
+    }
+
+    // Terug: eerst naar de eerste kaart bovenaan; staat die al in focus, dan opent het menu (app sluit nooit).
     BackToTop(
         atTop = { firstCardFocused || state.rows.isEmpty() },
         toTop = {
@@ -66,7 +90,7 @@ fun HomeScreen(onOpen: (ItemEntity) -> Unit, onSearch: () -> Unit, onSettings: (
             firstRowState.scrollToItem(0)
             firstCard.requestFocusAfterLayout()
         },
-        onBackAtTop = {},
+        onBackAtTop = { sidebarOpen = true },
     )
 
     val hero = focused ?: state.rows.firstOrNull()?.tiles?.firstOrNull()
@@ -86,18 +110,23 @@ fun HomeScreen(onOpen: (ItemEntity) -> Unit, onSearch: () -> Unit, onSettings: (
     Box(Modifier.fillMaxSize()) {
         HeroBackdrop(hero?.backdropUrls.orEmpty(), state.brandColor(hero?.providerId))
 
-        Column(Modifier.fillMaxSize()) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                // ◀ op de linkerrand (niets meer links om naartoe te gaan): menu openen.
+                .onPreviewKeyEvent { e ->
+                    if (sidebarOpen || e.type != KeyEventType.KeyDown || e.key != Key.DirectionLeft) return@onPreviewKeyEvent false
+                    if (!focusManager.moveFocus(FocusDirection.Left)) sidebarOpen = true
+                    true
+                },
+        ) {
             Row(
                 Modifier.fillMaxWidth().padding(start = 56.dp, end = 56.dp, top = 24.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text("ZAPPER", style = MaterialTheme.typography.headlineSmall, color = ZapperColors.Accent)
                 Spacer(Modifier.weight(1f))
-                // Donkere achtergrond: leesbaar boven elk hero-beeld, ook een licht.
-                val headerColors = ButtonDefaults.colors(containerColor = Color(0xCC1F1F1F), contentColor = Color.White)
-                Button(onClick = onSearch, colors = headerColors) { Text("Zoeken") }
-                Spacer(Modifier.width(12.dp))
-                Button(onClick = onSettings, colors = headerColors) { Text("Instellingen") }
+                Text("◀  menu", style = MaterialTheme.typography.labelMedium, color = ZapperColors.TextSecondary)
             }
 
             if (hero != null) {
@@ -111,7 +140,7 @@ fun HomeScreen(onOpen: (ItemEntity) -> Unit, onSearch: () -> Unit, onSettings: (
             }
 
             if (!state.loading && state.rows.isEmpty()) {
-                EmptyState(onSettings)
+                EmptyState { onNavigate(SidebarDestination.SETTINGS) }
             }
 
             LazyColumn(
@@ -136,6 +165,8 @@ fun HomeScreen(onOpen: (ItemEntity) -> Unit, onSearch: () -> Unit, onSettings: (
                         ) {
                             items(row.tiles, key = { it.id }) { tile ->
                                 val isFirst = rowIndex == 0 && tile == row.tiles.first()
+                                val cardKey = "${row.id}/${tile.id}"
+                                val requester = if (isFirst) firstCard else cardFocus.getOrPut(cardKey) { FocusRequester() }
                                 ContentCard(
                                     title = tile.title,
                                     imageUrls = tile.imageUrls,
@@ -144,19 +175,27 @@ fun HomeScreen(onOpen: (ItemEntity) -> Unit, onSearch: () -> Unit, onSettings: (
                                     providerLabel = state.providerNames[tile.providerId],
                                     progress = tile.progress,
                                     onClick = { activate(tile) },
-                                    onFocus = { focused = tile },
-                                    modifier = if (isFirst) {
-                                        Modifier.focusRequester(firstCard).onFocusChanged { firstCardFocused = it.isFocused }
-                                    } else {
-                                        Modifier
-                                    },
+                                    onFocus = { focused = tile; lastFocusedCard = cardKey },
+                                    modifier = Modifier
+                                        .focusRequester(requester)
+                                        .then(if (isFirst) Modifier.onFocusChanged { firstCardFocused = it.isFocused } else Modifier),
                                 )
+                                if (isFirst) cardFocus[cardKey] = firstCard
                             }
                         }
                     }
                 }
             }
         }
+
+        Sidebar(
+            open = sidebarOpen,
+            current = SidebarDestination.HOME,
+            onSelect = { dest ->
+                if (dest == SidebarDestination.HOME) closeSidebar() else { sidebarOpen = false; onNavigate(dest) }
+            },
+            onClose = ::closeSidebar,
+        )
     }
 
     LifecycleResumeEffect(Unit) {

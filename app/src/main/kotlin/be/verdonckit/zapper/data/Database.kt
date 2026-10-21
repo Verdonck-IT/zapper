@@ -120,6 +120,10 @@ interface CatalogDao {
     @Query("SELECT * FROM items ORDER BY title")
     fun allItems(): Flow<List<ItemEntity>>
 
+    /** Live-zenders in de volgorde van de providers. */
+    @Query("SELECT * FROM items WHERE kind = 'LIVE' ORDER BY providerId, rank")
+    fun liveChannels(): Flow<List<ItemEntity>>
+
     @Query("SELECT * FROM item_categories")
     fun allItemCategories(): Flow<List<ItemCategoryEntity>>
 

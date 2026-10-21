@@ -12,7 +12,9 @@ import androidx.navigation.compose.rememberNavController
 import be.verdonckit.zapper.data.ItemEntity
 import be.verdonckit.zapper.player.PlayerActivity
 import be.verdonckit.zapper.graph
+import be.verdonckit.zapper.ui.components.SidebarDestination
 import be.verdonckit.zapper.ui.detail.DetailScreen
+import be.verdonckit.zapper.ui.live.LiveScreen
 import be.verdonckit.zapper.ui.detail.EpisodeScreen
 import be.verdonckit.zapper.ui.home.HomeScreen
 import be.verdonckit.zapper.ui.search.SearchScreen
@@ -39,7 +41,17 @@ fun AppNav() {
         modifier = Modifier.fillMaxSize().background(ZapperColors.Background),
     ) {
         composable("home") {
-            HomeScreen(onOpen = ::open, onSearch = { nav.navigate("search") }, onSettings = { nav.navigate("settings") })
+            HomeScreen(
+                onOpen = ::open,
+                onNavigate = { dest ->
+                    when (dest) {
+                        SidebarDestination.HOME -> Unit
+                        SidebarDestination.SEARCH -> nav.navigate("search")
+                        SidebarDestination.LIVE -> nav.navigate("live")
+                        SidebarDestination.SETTINGS -> nav.navigate("settings")
+                    }
+                },
+            )
         }
         composable("detail/{key}") { entry ->
             DetailScreen(
@@ -58,6 +70,7 @@ fun AppNav() {
                 onGone = { nav.popBackStack() },
             )
         }
+        composable("live") { LiveScreen(onBack = { nav.popBackStack() }) }
         composable("search") { SearchScreen(onOpen = ::open, onBack = { nav.popBackStack() }) }
         composable("settings") { SettingsScreen(onBack = { nav.popBackStack() }) }
     }

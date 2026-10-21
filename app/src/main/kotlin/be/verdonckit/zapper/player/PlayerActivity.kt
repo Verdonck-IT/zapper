@@ -69,6 +69,32 @@ class PlayerActivity : ComponentActivity() {
     private val prefs by lazy { getSharedPreferences("player", MODE_PRIVATE) }
     private var isLive = false
 
+    private val idle by lazy {
+        be.verdonckit.zapper.core.IdleController(
+            this,
+            screensaverAfterMs = {
+                if (player != null) be.verdonckit.zapper.core.IdleController.PAUSED_SCREENSAVER_MS
+                else be.verdonckit.zapper.core.IdleController.NAVIGATION_SCREENSAVER_MS
+            },
+            // Speelt (of buffert om te spelen): nooit screensaver.
+            blocksIdle = {
+                val p = player
+                p != null && p.playWhenReady && p.playbackState != Player.STATE_ENDED && p.playbackState != Player.STATE_IDLE
+            },
+            caption = { if (player != null) "Gepauzeerd · $title" else null },
+        )
+    }
+
+    override fun onResume() {
+        super.onResume()
+        idle.start()
+    }
+
+    override fun onPause() {
+        idle.stop()
+        super.onPause()
+    }
+
     // Spoelen
     private var seekKeyDownAt = 0L
     private var lastSeekAt = 0L
@@ -78,7 +104,7 @@ class PlayerActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         playerView = PlayerView(this).apply {
-            keepScreenOn = true
+            // Scherm aan/uit regelt IdleController: aan tijdens afspelen, gepauzeerd na een tijd screensaver en slaap.
             // Geen +/- knoppen: spoelen gebeurt met ◀ / ▶ op de afstandsbediening.
             setShowRewindButton(false)
             setShowFastForwardButton(false)
@@ -257,6 +283,8 @@ class PlayerActivity : ComponentActivity() {
     // ---------- Afstandsbediening ----------
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        // Screensaver open: de toets sluit die enkel.
+        if (idle.handleKey(event)) return true
         val p = player ?: return super.dispatchKeyEvent(event)
         val down = event.action == KeyEvent.ACTION_DOWN
         when (event.keyCode) {

@@ -49,7 +49,7 @@ class VrtMaxProvider : StreamingProvider {
     // ---------- Catalogus ----------
 
     override suspend fun catalog(categoryId: String?, cursor: String?): Page<CatalogItem> {
-        if (categoryId == LIVE) return Page(LIVE_CHANNELS, null)
+        if (categoryId == LIVE) return Page(liveChannels(), null)
         val listId = if (categoryId == POPULAR) popularListId() else searchListId(categoryId)
 
         val vars = "{\"listId\":${jsonString(listId)},\"lazyItemCount\":$PAGE_SIZE" +
@@ -89,6 +89,54 @@ class VrtMaxProvider : StreamingProvider {
         host.storage.put("popular.listId.exp", (host.nowMillis() + 6 * 3600 * 1000).toString())
         host.log(be.verdonckit.zapper.api.LogLevel.INFO, "VRT MAX populair = '${title(chosen)}'")
         return id
+    }
+
+    /**
+     * Live-zenders met het officiële logo (variant voor donkere achtergrond) uit de
+     * livestreampagina's van VRT MAX; één keer per dag opgehaald. Zenders zonder eigen
+     * pagina of bij een fout: het vaste logo.
+     */
+    private suspend fun liveChannels(): List<CatalogItem> {
+        val logos = runCatching { liveLogos() }.getOrElse {
+            host.log(be.verdonckit.zapper.api.LogLevel.WARN, "VRT MAX zenderlogo's: ${it.message}")
+            emptyMap()
+        }
+        return LIVE_CHANNELS.map { ch ->
+            CatalogItem(
+                id = "live-${ch.streamId}",
+                kind = ItemKind.LIVE,
+                title = ch.name,
+                description = "Live op ${ch.name}",
+                logoUrl = logos[ch.streamId] ?: ch.fallbackLogo,
+                nativeCategoryIds = listOf(LIVE),
+                playableId = "$LIVE_PREFIX${ch.streamId}",
+            )
+        }
+    }
+
+    private suspend fun liveLogos(): Map<String, String> {
+        val exp = host.storage.get("live.logos.exp")?.toLongOrNull() ?: 0
+        host.storage.get("live.logos")?.takeIf { exp > host.nowMillis() }?.let { cached ->
+            val o = JSONObject(cached)
+            return o.keys().asSequence().associateWith { o.getString(it) }
+        }
+        val withPage = LIVE_CHANNELS.filter { it.pageSlug != null }
+        // Eén query met een alias per zender.
+        val query = "query LiveLogos { " + withPage.withIndex().joinToString(" ") { (i, ch) ->
+            "c$i: page(id: ${jsonString("/vrtmax/livestream/video/${ch.pageSlug}/")}) { ... on LivestreamPage { brandLogos { type primary } } }"
+        } + " }"
+        val data = api.graphql("LiveLogos", query, "{}")
+        val out = HashMap<String, String>()
+        withPage.forEachIndexed { i, ch ->
+            val logos = data.obj("c$i")?.arr("brandLogos")?.objects().orEmpty()
+            // PNG: Coil decodeert SVG niet zonder extra decoder.
+            logos.firstOrNull { it.str("type") == "png" }?.str("primary")?.let { out[ch.streamId] = it }
+        }
+        val json = JSONObject()
+        out.forEach { (k, v) -> json.put(k, v) }
+        host.storage.put("live.logos", json.toString())
+        host.storage.put("live.logos.exp", (host.nowMillis() + 24 * 3600 * 1000).toString())
+        return out
     }
 
     private fun programTile(node: JSONObject, categoryId: String?): CatalogItem? {
@@ -340,22 +388,15 @@ class VrtMaxProvider : StreamingProvider {
             NativeCategory("levensbeschouwing", "Levensbeschouwing"),
         )
 
+        private data class LiveChannel(val streamId: String, val name: String, val pageSlug: String?, val fallbackLogo: String)
+
         private val LIVE_CHANNELS = listOf(
-            "vualto_een_geo" to "VRT 1",
-            "vualto_canvas_geo" to "VRT Canvas",
-            "vualto_ketnet_geo" to "Ketnet",
-            "vualto_sporza_geo" to "Sporza",
-            "vualto_nieuws" to "VRT NWS",
-        ).map { (id, name) ->
-            CatalogItem(
-                id = "live-$id",
-                kind = ItemKind.LIVE,
-                title = name,
-                description = "Live op $name",
-                nativeCategoryIds = listOf(LIVE),
-                playableId = "$LIVE_PREFIX$id",
-            )
-        }
+            LiveChannel("vualto_een_geo", "VRT 1", "vrt1", "https://images.vrt.be/orig/2023/04/28/c448d669-e5c1-11ed-91d7-02b7b76bf47f.png"),
+            LiveChannel("vualto_canvas_geo", "VRT Canvas", "vrt-canvas", "https://images.vrt.be/orig/2023/11/09/1ae4c23e-7ef9-11ee-91d7-02b7b76bf47f.png"),
+            LiveChannel("vualto_ketnet_geo", "Ketnet", "ketnet", "https://images.vrt.be/orig/2024/10/22/03aa85a7-302c-4b2e-8028-71b52ae0a38d.png"),
+            LiveChannel("vualto_sporza_geo", "Sporza", null, "https://images.vrt.be/orig/logo/sporza/sporza_logo_wit.png"),
+            LiveChannel("vualto_nieuws", "VRT NWS", null, "https://images.vrt.be/orig/logos/vrtnws.png"),
+        )
 
         /** VRT MAX zoeklijst-id: "$" + base64("o%14|<json>|watch%"), met Python-json.dumps-opmaak. */
         internal fun searchListId(category: String?): String {

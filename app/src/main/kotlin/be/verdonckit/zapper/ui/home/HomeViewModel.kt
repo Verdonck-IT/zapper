@@ -57,7 +57,8 @@ class HomeViewModel(private val graph: AppGraph) : ViewModel() {
     private val categories = graph.categoryMapper.categories
 
     private val categoryRows = dao.categoriesWithContent().flatMapLatest { present ->
-        val ordered = categories.filter { it.id in present }
+        // Live tv heeft een eigen pagina (menu > Live tv), niet meer als rij op het startscherm.
+        val ordered = categories.filter { it.id in present && it.id != LIVE_CATEGORY }
         if (ordered.isEmpty()) {
             flowOf(emptyList())
         } else {
@@ -171,6 +172,8 @@ class HomeViewModel(private val graph: AppGraph) : ViewModel() {
     )
 
     companion object {
+        const val LIVE_CATEGORY = "live"
+
         fun episodeCode(season: Int?, episode: Int?): String? = when {
             season != null && episode != null -> "S$season A$episode"
             episode != null -> "Aflevering $episode"

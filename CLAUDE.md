@@ -31,6 +31,10 @@ Klaar:
   (< 6 u) gaat voor. Detail: volgende aflevering klaar, bekeken afleveringen/seizoenen gemarkeerd. Zie `data/ProgressSync.kt`.
 - Player: ◀/▶ spoelen (10 s, ingedrukt 30/60 s), OK = pauze, ▼ = CC-knop, CC-toets = ondertitels aan/uit (onthouden).
 - Zoekscherm: zoekbalk + categoriefilters + raster A–Z, accentongevoelig, lokaal op de Room-index.
+- Startscherm: sidebar (Home, Zoeken, Live tv, Instellingen) via ◀ op de linkerrand of terug bovenaan; terug sluit de app nooit.
+- Live tv: eigen pagina met officiële zenderlogo's (VRT `brandLogos`, dag gecachet, vaste URL als terugval).
+- Inactiviteit (`core/IdleController.kt`): 5 min (gepauzeerd: 3 min) → OLED-veilige screensaver; 15 min later scherm loslaten
+  → systeemslaap. Tijdens afspelen nooit.
 - Beelden: fallback-keten (liggend → staand → titel-art → gegenereerde titelkaart in merkkleur).
 
 Geverifieerd: provider-api + VRT-plugin + testkit compileren (Kotlin 2.1); cookie-jar; ECDSA-signatuur Python→Java;
