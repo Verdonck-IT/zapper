@@ -30,6 +30,7 @@ Klaar:
   `Episode.progress`, `StreamInfo.resumePositionSeconds`). Rij "Verder kijken" = lijst van het platform; lokale voortgang
   (< 6 u) gaat voor. Detail: volgende aflevering klaar, bekeken afleveringen/seizoenen gemarkeerd. Zie `data/ProgressSync.kt`.
 - Player: ◀/▶ spoelen (10 s, ingedrukt 30/60 s), OK = pauze, ▼ = CC-knop, CC-toets = ondertitels aan/uit (onthouden).
+  Live: knop links van CC in de bedieningsbalk, "● LIVE" of (> 10 s achter) "⏭ Naar live (−m:ss)".
 - Zoekscherm: zoekbalk + categoriefilters + raster A–Z, accentongevoelig, lokaal op de Room-index.
 - Startscherm: sidebar (Home, Zoeken, Live tv, Instellingen) via ◀ op de linkerrand of terug bovenaan; terug sluit de app nooit.
 - Live tv: eigen pagina met officiële zenderlogo's (VRT `brandLogos`, dag gecachet, vaste URL als terugval).

@@ -56,6 +56,16 @@ class PlayerActivity : ComponentActivity() {
     private lateinit var playerView: PlayerView
     private lateinit var message: TextView
     private lateinit var seekLabel: TextView
+    /** Live: "● LIVE" aan de rand, of de knop "Naar live" als je achterloopt. */
+    private lateinit var liveButton: TextView
+    /** Afstand tot de live-rand bij normaal live kijken (elke stream heeft een eigen vertraging). */
+    private var liveBaseline: Long? = null
+    private val updateLive = object : Runnable {
+        override fun run() {
+            refreshLiveButton()
+            liveButton.postDelayed(this, 1_000)
+        }
+    }
     private var progressJob: Job? = null
     private var plugin: LoadedPlugin? = null
     private var stream: StreamInfo? = null
@@ -129,6 +139,26 @@ class PlayerActivity : ComponentActivity() {
             background = GradientDrawable().apply { cornerRadius = 16f; setColor(0xB3000000.toInt()) }
             visibility = View.GONE
         }
+        val dp = resources.displayMetrics.density
+        liveButton = TextView(this).apply {
+            textSize = 15f
+            setTextColor(0xFFFFFFFF.toInt())
+            gravity = Gravity.CENTER
+            setPadding((14 * dp).toInt(), (6 * dp).toInt(), (14 * dp).toInt(), (6 * dp).toInt())
+            visibility = View.GONE
+            isFocusable = false
+            setOnClickListener { jumpToLive() }
+            setOnFocusChangeListener { _, _ -> refreshLiveButton() }
+        }
+        // In de bedieningsbalk, links van de ondertitelknop: ▼ naar CC, dan ◀ naar "Naar live".
+        playerView.findViewById<ViewGroup>(Media3R.id.exo_basic_controls)?.addView(
+            liveButton,
+            0,
+            android.widget.LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                marginEnd = (8 * dp).toInt()
+            },
+        )
         setContentView(FrameLayout(this).apply {
             setBackgroundColor(0xFF000000.toInt())
             addView(playerView, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
@@ -215,6 +245,8 @@ class PlayerActivity : ComponentActivity() {
         exo.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
                 if (state == Player.STATE_READY) message.text = ""
+                // Eerste keer klaar (of net naar live gesprongen): dit is "live" voor deze stream.
+                if (state == Player.STATE_READY && isLive && liveBaseline == null) liveBaseline = behindLiveMs()
                 if (state == Player.STATE_ENDED) finish()
             }
 
@@ -240,6 +272,11 @@ class PlayerActivity : ComponentActivity() {
         exo.prepare()
         exo.playWhenReady = true
         player = exo
+        liveBaseline = null
+        if (stream.isLive) {
+            liveButton.removeCallbacks(updateLive)
+            liveButton.post(updateLive)
+        }
 
         progressJob = lifecycleScope.launch {
             var ticks = 0
@@ -383,6 +420,58 @@ class PlayerActivity : ComponentActivity() {
         return false
     }
 
+    // ---------- Live ----------
+
+    /** Hoe ver achter de live-rand (ms); null als de stream dat niet meldt. */
+    private fun behindLiveMs(): Long? {
+        val p = player ?: return null
+        if (!p.isCurrentMediaItemLive) return null
+        p.currentLiveOffset.takeIf { it != C.TIME_UNSET }?.let { return it }
+        // Geen programmatijd in de stream: afstand tot het einde van het live-venster.
+        val dur = p.duration.takeIf { it != C.TIME_UNSET } ?: return null
+        return (dur - p.currentPosition).coerceAtLeast(0)
+    }
+
+    private fun lag(): Long? {
+        val behind = behindLiveMs() ?: return null
+        return (behind - (liveBaseline ?: behind)).coerceAtLeast(0)
+    }
+
+    private fun isBehindLive(): Boolean = (lag() ?: 0) > BEHIND_LIVE_MS
+
+    private fun refreshLiveButton() {
+        if (!isLive || player == null) {
+            liveButton.visibility = View.GONE
+            return
+        }
+        val behind = isBehindLive()
+        liveButton.isFocusable = behind
+        // Weer live: focus naar de ondertitelknop ernaast, zodat ◀/▶ niet op een dode knop blijven.
+        if (!behind && liveButton.hasFocus()) focusSubtitleButton()
+        liveButton.text = if (behind) "⏭  Naar live  (−${format(lag() ?: 0)})" else "●  LIVE"
+        val focused = liveButton.hasFocus()
+        liveButton.setTextColor(if (focused) 0xFF000000.toInt() else 0xFFFFFFFF.toInt())
+        liveButton.background = GradientDrawable().apply {
+            cornerRadius = 40f
+            setColor(
+                when {
+                    focused -> 0xFFFFFFFF.toInt()
+                    behind -> 0xCC202020.toInt()
+                    else -> 0xCCE50914.toInt()
+                },
+            )
+        }
+        liveButton.visibility = View.VISIBLE
+    }
+
+    private fun jumpToLive() {
+        val p = player ?: return
+        p.seekToDefaultPosition()
+        p.play()
+        flash("Live")
+        refreshLiveButton()
+    }
+
     private fun flash(text: String) {
         seekLabel.text = text
         seekLabel.visibility = View.VISIBLE
@@ -447,6 +536,7 @@ class PlayerActivity : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
+        liveButton.removeCallbacks(updateLive)
         progressJob?.cancel()
         val p = player ?: return
         val ended = p.playbackState == Player.STATE_ENDED
@@ -474,6 +564,8 @@ class PlayerActivity : ComponentActivity() {
         private const val EXTRA_ITEM_KEY = "itemKey"
         private const val EXTRA_IMAGE = "image"
         private const val EXTRA_FROM_START = "fromStart"
+        /** Meer dan dit achter de live-rand: knop "Naar live". */
+        private const val BEHIND_LIVE_MS = 10_000L
         private const val PREF_SUBS = "subtitles.enabled"
         private const val PREF_SUBS_LANG = "subtitles.language"
 
