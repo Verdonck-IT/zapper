@@ -1,109 +1,97 @@
 # Zapper
 
-Eén Android TV-app met een Netflix-achtige interface voor VRT MAX, VTM GO, Play en Focus & WTV.
-Inhoud van alle zenders staat door elkaar in gedeelde rijen (Crime, Humor, Docu, …).
-Elke zender is een plugin die zichzelf bijwerkt zonder nieuwe APK.
+Eén Android TV-app voor de Vlaamse streamingplatformen, met een Netflix-achtige interface.
+VRT MAX, Play en de live-zenders van Focus en WTV staan samen in één app: door elkaar in gedeelde rijen
+(Fictie, Crime & thriller, Humor, Docu, …), met één "Verder kijken" en één "Mijn lijst" voor alle zenders.
 
-> Status: skelet + VRT MAX. Nog niet gecompileerd in een omgeving met Android SDK;
-> verwacht wat kleine compileerfixes bij de eerste build.
+![Startscherm](docs/screenshots/startscherm.jpg)
 
-## Hoe het in elkaar zit
+> Persoonlijk project, niet gelinkt aan VRT, Play Media of Focus & WTV. Je kijkt met je eigen
+> (gratis) accounts; DRM wordt niet omzeild.
 
+## Wat kan Zapper?
+
+- **Eén startscherm voor alle zenders** – rijen per genre met programma's van alle zenders door elkaar,
+  en "Moet je nu zien" uit de populaire lijsten van de zenders zelf.
+- **Verder kijken zoals op de website** – Zapper volgt wat VRT MAX en Play zelf bijhouden en meldt
+  je voortgang terug. Begin je op je gsm, dan kijk je verder op de TV, en omgekeerd.
+- **De volgende aflevering staat klaar** – open een reeks en Zapper selecteert het juiste seizoen en
+  de aflevering waar je zat. Bekeken afleveringen en seizoenen zijn gemarkeerd.
+- **Mijn lijst** – bewaar programma's; de lijst is dezelfde als in de app of op de website van de zender.
+- **Live tv** – alle live-zenders op één pagina, de populairste eerst, met een knop "Naar live" als je achterloopt.
+- **Zoeken en bladeren** – door de volledige catalogus A–Z of per categorie.
+- **Gemaakt voor de afstandsbediening** – spoelen met de pijltjes, ondertitels met één knop.
+- **Werkt zichzelf bij** – de app en de zenders worden automatisch bijgewerkt.
+
+## Zenders
+
+| Zender | Inhoud | Account |
+|---|---|---|
+| VRT MAX | programma's, films, live: VRT 1, VRT Canvas, Ketnet, Sporza, VRT NWS | gratis VRT-profiel |
+| Play | programma's, films, live: Play, Play Fictie, Play Crime, Play Reality, Play Actie, Nostalgie | gratis Play-account |
+| Focus & WTV | live: Focus, WTV | geen login nodig |
+
+Play Kinepolis (huur- en koopfilms) zit er niet in. VTM GO volgt later.
+
+## In beeld
+
+| | |
+|---|---|
+| ![Programma](docs/screenshots/programma.jpg) **Programma** – verder kijken waar je zat, bekeken seizoenen en afleveringen. | ![Afleveringen](docs/screenshots/afleveringen.jpg) **Afleveringen** – "Volgende" en "✓ Bekeken" in één oogopslag. |
+| ![Aflevering](docs/screenshots/aflevering.jpg) **Aflevering** – eerst info, dan afspelen. | ![Menu](docs/screenshots/menu.jpg) **Menu** – Home, Zoeken, Mijn lijst, Live tv en Instellingen. |
+| ![Zoeken](docs/screenshots/zoeken.jpg) **Zoeken** – alles A–Z, of filter op categorie. | ![Live tv](docs/screenshots/live-tv.jpg) **Live tv** – alle zenders, populairste eerst. |
+| ![Live kijken](docs/screenshots/player-live.jpg) **Live kijken** – "● LIVE", of "Naar live" als je achterloopt. | |
+
+## Installeren op je TV
+
+Zapper staat niet in de Play Store; je installeert de app één keer zelf ("sideloaden").
+
+**Met de app Downloader** (makkelijkst):
+
+1. Installeer *Downloader* (AFTVnews) uit de Play Store op je TV.
+2. Sta in de TV-instellingen *Apps van onbekende bronnen* toe voor Downloader.
+3. Open in Downloader de link naar `app-release.apk` van de
+   [laatste release](https://github.com/Verdonck-IT/zapper/releases/latest) en installeer.
+
+**Met een computer** (adb):
+
+```bash
+adb connect <ip-van-je-tv>:5555
+adb install app-release.apk
 ```
-┌──────────────────── Android TV ─────────────────────┐
-│  UI (Compose for TV)  ◄── Room-index ◄── Sync-worker │
-│        │                                   │          │
-│        ▼                                   ▼          │
-│  Player (Media3 + Widevine)        PluginManager      │
-│        ▲                          (DEX, signatuur,    │
-│        └── manifest + licentie ──  self-test, rollback)
-└───────────────────────────────────────▲───────────────┘
-                                        │ index.json (+ .sig), plugin-jars
-┌────────────── GitHub ─────────────────┴───────────────┐
-│ plugins.yml        bouwt, dext, signeert, publiceert   │
-│ nightly-health.yml contracttest op runner thuis        │
-│                    ↳ faalt? HAR-opname + fix-agent → PR│
-│ upstream-watch.yml Kodi-add-on gewijzigd? agent → PR   │
-│ app-release.yml    APK + app.json voor self-update     │
-└────────────────────────────────────────────────────────┘
-```
 
-- **provider-api**: het contract. Plugins leveren alleen logica (login, catalogus, stream
-  resolven); netwerk, opslag, DRM en UI zitten in de host.
-- **Categorieën**: `app/src/main/assets/categories.json` mapt native genres per zender naar
-  één taxonomie, met trefwoorden als aanvulling. Dezelfde titel bij twee zenders wordt
-  samengevoegd; op het detailscherm kies je waar je kijkt.
-- **Veiligheid**: de index is ECDSA-gesigneerd, elke jar heeft een sha256 in die index.
-  Een update die de self-test niet haalt, wordt automatisch teruggedraaid.
+Sta daarna *onbekende bronnen* toe voor Zapper zelf; zo kan de app zichzelf bijwerken.
 
-## Eenmalige setup
+### Eerste keer
 
-1. **Signeersleutel voor plugins**
-   ```bash
-   pip install cryptography
-   python tools/signing/keygen.py
-   ```
-   - inhoud van `plugin-signing-key.pem` → secret `PLUGIN_SIGNING_KEY` (en daarna lokaal wissen of veilig bewaren)
-   - publieke sleutel → variable of secret `ZAPPER_PLUGIN_PUBLIC_KEY` en in `~/.gradle/gradle.properties` als `zapperPluginPublicKey=…`
+1. Open Zapper, druk ◀ en kies **Instellingen**.
+2. Log in bij VRT MAX en Play met je eigen account. Focus & WTV heeft geen login nodig.
+3. Kies **Catalogus nu syncen**, of wacht even: de catalogus wordt automatisch opgebouwd.
 
-2. **Dist-site** (waar de TV updates ophaalt)
-   - Standaard: branch `gh-pages` van dit (publieke) repo via GitHub Pages,
-     https://verdonck-it.github.io/zapper/. De workflows maken de branch zelf aan.
-   - Andere host? Variables `DIST_REPO`, `ZAPPER_UPDATE_BASE_URL` en secret `DIST_TOKEN`
-     (fine-grained PAT met *Contents: write* op dat repo).
-   - Er staan geen geheimen op die site: enkel gesigneerde plugins en de APK.
+## Bediening
 
-3. **App-signeersleutel** (altijd dezelfde, anders weigert Android updates). Daarna een release
-   starten met een tag (`git tag v0.1.0 && git push --tags`) of via *Run workflow* bij "App release".
-   ```bash
-   keytool -genkeypair -v -keystore zapper.jks -alias zapper -keyalg RSA -keysize 4096 -validity 10000
-   base64 -w0 zapper.jks   # → secret ZAPPER_KEYSTORE_B64
-   ```
-   Secrets: `ZAPPER_KEYSTORE_PASSWORD`, `ZAPPER_KEY_ALIAS`, `ZAPPER_KEY_PASSWORD`.
+| Waar | Toets | Wat |
+|---|---|---|
+| Startscherm | ◀ op de linkerrand, of **terug** bovenaan | menu openen |
+| Startscherm, zoeken, lijsten | **terug** | eerst naar boven, dan terug; de app sluit nooit vanzelf |
+| Programma, aflevering | **terug** | meteen terug naar het vorige scherm |
+| Verder kijken | **OK ingedrukt houden** | naar het programma, of verwijderen uit Verder kijken |
+| Player | ◀ / ▶ | 10 seconden spoelen; ingedrukt houden gaat sneller (30 s, 60 s) |
+| Player | **OK** | pauze / verder |
+| Player | ▼ | naar de ondertitelknop (CC); ◀ daarnaast: **Naar live** |
+| Player | **CC-toets** | ondertitels aan/uit (wordt onthouden) |
 
-4. **Self-hosted runner thuis** (Raspberry Pi 4/5, NAS of mini-pc)
-   - Repo → Settings → Actions → Runners → *New self-hosted runner*, label `zapper-be`.
-   - Variable `HEALTH_RUNNER=true` (zonder die variabele slaat de nachtelijke check zichzelf over).
-   - Installeer Java 17 en Node 22. Optioneel Google Chrome + variable `CHROME_CHANNEL=chrome`
-     (dan staat ook de licentie-request in de HAR-opname).
-   - Secrets: `VRTMAX_USERNAME`, `VRTMAX_PASSWORD`, `PLAY_USERNAME`, `PLAY_PASSWORD`, `ANTHROPIC_API_KEY`
-     (de laatste ook voor "Upstream volgen"; zonder sleutel enkel een waarschuwing).
+Gebruik je Zapper een tijdje niet, dan verschijnt een donkere, OLED-veilige screensaver
+(na 5 minuten, of na 3 minuten met een gepauzeerde video). Daarna neemt de slaapstand van je TV het over.
+Tijdens het afspelen gebeurt dat nooit.
 
-5. **Eerste installatie op de TV**
-   ```bash
-   adb connect <ip-van-tv>:5555
-   adb install app-release.apk     # uit de GitHub release
-   ```
-   Sta daarna in de TV-instellingen *onbekende bronnen* toe voor Zapper; zo kan de app
-   zichzelf bijwerken. Log in via **Instellingen** in de app.
+## Goed om te weten
 
-## Ontwikkelen
+- De beeldkwaliteit hangt af van je TV (Widevine L1 of L3).
+- Sommige inhoud is enkel beschikbaar in België.
+- Problemen of ideeën? Maak een [issue](https://github.com/Verdonck-IT/zapper/issues).
 
-- Open de map in Android Studio en draai de `debug`-variant op de TV of een TV-emulator.
-  In debug wordt de VRT MAX-plugin rechtstreeks van het classpath geladen
-  (`DEV_PLUGINS` in `app/build.gradle.kts`), geen DEX of download nodig.
-- Plugin live testen zonder TV:
-  ```bash
-  VRTMAX_USERNAME=… VRTMAX_PASSWORD=… ./gradlew :plugins:vrtmax:test
-  cat plugins/vrtmax/build/health/vrtmax.json
-  ```
+## Voor ontwikkelaars
 
-## Een zender toevoegen (VTM GO, Play, Focus & WTV)
-
-1. `plugins/<id>/` kopiëren van `vrtmax`, `zapper-plugin.properties` aanpassen.
-2. `include(":plugins:<id>")` in `settings.gradle.kts` en de entry class toevoegen aan
-   `DEV_PLUGINS`.
-3. Native categorieën mappen in `categories.json` onder `providers.<id>`.
-4. Regel in de matrix van `nightly-health.yml`, secrets `<ID>_USERNAME/_PASSWORD`,
-   een flow in `tools/har-capture/capture.mjs` en de upstream-repo in `.github/agent/upstream.json`.
-5. Heeft het platform een eigen licentieformaat? Zet `DrmInfo(handledByProvider = true)`
-   en implementeer `acquireLicense()`.
-
-## Bekende beperkingen
-
-- Widevine-niveau van je TV (L1/L3) bepaalt de maximale kwaliteit.
-- De VRT-flow komt uit de Kodi-add-on [add-ons/plugin.video.vrt.nu](https://github.com/add-ons/plugin.video.vrt.nu) (GPLv3);
-  de GraphQL-queries zijn ingekort en nog niet live geverifieerd.
-- Nog niet gebouwd: zoekscherm (de query staat al in `CatalogDao.search`), EPG voor live tv,
-  "volgende aflevering" na het einde.
-- De fix-agent kan op de runner de zender-credentials zien (nodig om de test te draaien).
+Architectuur, plugins, de build- en publicatiestraat en hoe je een zender toevoegt:
+zie [docs/TECHNISCH.md](docs/TECHNISCH.md).

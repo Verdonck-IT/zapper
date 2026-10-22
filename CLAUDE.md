@@ -3,6 +3,9 @@
 Android TV-app (Kotlin, Compose for TV, Media3) met een Netflix-achtige interface die
 Vlaamse streamingplatformen bundelt. Persoonlijk gebruik, gesideload.
 
+Documentatie: `README.md` is voor gebruikers (met screenshots in `docs/screenshots/`); technische zaken
+(architectuur, CI/CD, setup, nieuwe zender) staan in `docs/TECHNISCH.md`. Hou beide bij bij nieuwe functies.
+
 ## Modules
 - `provider-api/` – het contract tussen app en plugins (`StreamingProvider`, `HostServices`,
   modellen) plus gedeelde helpers (cookie-jar, redirects, `ProviderSelfTest`).

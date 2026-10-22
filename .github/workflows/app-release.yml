@@ -37,6 +37,14 @@ jobs:
             exit 1
           fi
 
+      - name: Versie bepalen
+        id: version
+        run: |
+          # Tag v1.2.3 → versionName 1.2.3; handmatige run → 0.1.<run>. versionCode stijgt altijd (run-nummer).
+          if [ "${{ github.ref_type }}" = "tag" ]; then name="${GITHUB_REF_NAME#v}"; else name="0.1.${{ github.run_number }}"; fi
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "Versie $name (code ${{ github.run_number }})"
+
       - name: Keystore klaarzetten
         env:
           KEYSTORE_B64: ${{ secrets.ZAPPER_KEYSTORE_B64 }}
@@ -46,7 +54,7 @@ jobs:
         run: >
           ./gradlew :app:assembleRelease
           -PzapperVersionCode=${{ github.run_number }}
-          -PzapperVersionName=0.1.${{ github.run_number }}
+          -PzapperVersionName=${{ steps.version.outputs.name }}
           -PzapperUpdateBaseUrl=${{ vars.ZAPPER_UPDATE_BASE_URL || 'https://verdonck-it.github.io/zapper/' }}
           -PzapperPluginPublicKey=${{ vars.ZAPPER_PLUGIN_PUBLIC_KEY || secrets.ZAPPER_PLUGIN_PUBLIC_KEY }}
           -PzapperKeystore=$RUNNER_TEMP/zapper.jks
@@ -67,12 +75,12 @@ jobs:
           python tools/publish/publish_app.py \
             --apk app/build/outputs/apk/release/app-release.apk \
             --version-code ${{ github.run_number }} \
-            --version-name 0.1.${{ github.run_number }} \
+            --version-name ${{ steps.version.outputs.name }} \
             --dist dist
           cd dist
           git config user.name "zapper-ci"
           git config user.email "zapper-ci@users.noreply.github.com"
-          git add -A && git commit -m "app: 0.1.${{ github.run_number }}" && git push
+          git add -A && git commit -m "app: ${{ steps.version.outputs.name }}" && git push
 
       - name: GitHub release (voor de eerste sideload)
         uses: softprops/action-gh-release@v2
