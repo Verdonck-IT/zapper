@@ -27,9 +27,13 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 17 }
       - uses: gradle/actions/setup-gradle@v4
-      - uses: android-actions/setup-android@v3
+      # De runner heeft de Android SDK al (ANDROID_HOME); setup-android faalde op de licentiestap.
       - name: Build-tools en platform voor d8
-        run: sdkmanager "build-tools;35.0.0" "platforms;android-35"
+        run: |
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKM" --licenses >/dev/null || true
+          "$SDKM" --install "build-tools;35.0.0" "platforms;android-35" >/dev/null
+          ls "$ANDROID_HOME/build-tools/35.0.0/d8" "$ANDROID_HOME/platforms/android-35/android.jar"
 
       - name: Plugins bouwen + unit tests
         run: ./gradlew test $(for d in plugins/*/; do n=$(basename $d); echo ":plugins:$n:jar :plugins:$n:dexClasspath"; done)
