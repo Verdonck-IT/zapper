@@ -94,7 +94,8 @@ class PluginManager(
 
     suspend fun checkForUpdates(): List<UpdateOutcome> = mutex.withLock {
         withContext(Dispatchers.IO) {
-            val base = BuildConfig.UPDATE_BASE_URL.trimEnd('/') + "/plugins/"
+            val site = BuildConfig.UPDATE_BASE_URL.trimEnd('/') + "/"
+            val base = site + "plugins/"
             val indexBytes = fetch(base + "index.json")
             val signature = fetch(base + "index.json.sig").toString(Charsets.UTF_8)
             check(PluginVerifier.verifyIndex(indexBytes, signature, BuildConfig.PLUGIN_PUBLIC_KEY)) {
@@ -103,16 +104,17 @@ class PluginManager(
 
             PluginIndex.parse(indexBytes.toString(Charsets.UTF_8))
                 .filter { it.apiVersion == PROVIDER_API_VERSION }
-                .mapNotNull { entry -> runCatching { install(entry, base) }.getOrElse { UpdateOutcome.Failed(entry.id, it.message ?: it.toString()) } }
+                .mapNotNull { entry -> runCatching { install(entry, site) }.getOrElse { UpdateOutcome.Failed(entry.id, it.message ?: it.toString()) } }
         }
     }
 
-    private suspend fun install(entry: PluginEntry, base: String): UpdateOutcome? {
+    /** [site] = root van de dist-site; `entry.file` is daar relatief aan ("plugins/<id>/<id>-<build>.jar"), net als de APK in app.json. */
+    private suspend fun install(entry: PluginEntry, site: String): UpdateOutcome? {
         val current = prefs.getInt("current.${entry.id}", -1)
         if (entry.build <= current || isBad(entry.id, entry.build)) return null
         if (_plugins.value[entry.id]?.isDev == true) return null
 
-        val bytes = fetch(base + entry.file)
+        val bytes = fetch(site + entry.file.trimStart('/'))
         check(PluginVerifier.sha256Hex(bytes) == entry.sha256) { "sha256 van ${entry.file} klopt niet" }
 
         val target = jarFile(entry.id, entry.build)

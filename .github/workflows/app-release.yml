@@ -18,6 +18,25 @@ jobs:
         with: { distribution: temurin, java-version: 17 }
       - uses: gradle/actions/setup-gradle@v4
 
+      - name: Controle secrets
+        env:
+          KEYSTORE_B64: ${{ secrets.ZAPPER_KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ZAPPER_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ZAPPER_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ZAPPER_KEY_PASSWORD }}
+          PLUGIN_PUBLIC_KEY: ${{ vars.ZAPPER_PLUGIN_PUBLIC_KEY || secrets.ZAPPER_PLUGIN_PUBLIC_KEY }}
+        run: |
+          missing=""
+          [ -n "$KEYSTORE_B64" ] || missing="$missing ZAPPER_KEYSTORE_B64"
+          [ -n "$KEYSTORE_PASSWORD" ] || missing="$missing ZAPPER_KEYSTORE_PASSWORD"
+          [ -n "$KEY_ALIAS" ] || missing="$missing ZAPPER_KEY_ALIAS"
+          [ -n "$KEY_PASSWORD" ] || missing="$missing ZAPPER_KEY_PASSWORD"
+          [ -n "$PLUGIN_PUBLIC_KEY" ] || missing="$missing ZAPPER_PLUGIN_PUBLIC_KEY"
+          if [ -n "$missing" ]; then
+            echo "::error title=Secrets ontbreken::Zet deze repository-secrets:$missing (zie README, 'App-release')."
+            exit 1
+          fi
+
       - name: Keystore klaarzetten
         env:
           KEYSTORE_B64: ${{ secrets.ZAPPER_KEYSTORE_B64 }}
