@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-22T08:45:31+00:00",
+  "generatedAt": "2026-10-22T09:43:49+00:00",
   "plugins": [
     {
       "id": "focuswtv",
@@ -24,12 +24,12 @@
     {
       "id": "vrtmax",
       "name": "VRT MAX",
-      "build": 6,
-      "version": "2026.10.22.6",
+      "build": 7,
+      "version": "2026.10.22.7",
       "apiVersion": 4,
       "entryClass": "be.verdonckit.zapper.plugins.vrtmax.VrtMaxProvider",
-      "file": "plugins/vrtmax/vrtmax-6.jar",
-      "sha256": "0388dc3ce92aa0f1b73e6a6f89458dc554e13b79810b3d478cc13f31ef145a4b"
+      "file": "plugins/vrtmax/vrtmax-7.jar",
+      "sha256": "b8fcadd796e0054ed7c14d8af8e26a4b950fd114c12c62612559917ca0a0a564"
     }
   ]
 }
