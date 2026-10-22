@@ -1,0 +1,35 @@
+{
+  "generatedAt": "2026-10-22T08:45:31+00:00",
+  "plugins": [
+    {
+      "id": "focuswtv",
+      "name": "Focus & WTV",
+      "build": 6,
+      "version": "2026.10.22.6",
+      "apiVersion": 4,
+      "entryClass": "be.verdonckit.zapper.plugins.focuswtv.FocusWtvProvider",
+      "file": "plugins/focuswtv/focuswtv-6.jar",
+      "sha256": "48535b560a551533da3acd468d77ec0b5087138c260b5cfe2cbcd396862abd94"
+    },
+    {
+      "id": "play",
+      "name": "Play",
+      "build": 6,
+      "version": "2026.10.22.6",
+      "apiVersion": 4,
+      "entryClass": "be.verdonckit.zapper.plugins.play.PlayProvider",
+      "file": "plugins/play/play-6.jar",
+      "sha256": "968016f28f1ec8ccae990e92e6c20addeb5630254baebe7da003773fc005aa02"
+    },
+    {
+      "id": "vrtmax",
+      "name": "VRT MAX",
+      "build": 6,
+      "version": "2026.10.22.6",
+      "apiVersion": 4,
+      "entryClass": "be.verdonckit.zapper.plugins.vrtmax.VrtMaxProvider",
+      "file": "plugins/vrtmax/vrtmax-6.jar",
+      "sha256": "0388dc3ce92aa0f1b73e6a6f89458dc554e13b79810b3d478cc13f31ef145a4b"
+    }
+  ]
+}
