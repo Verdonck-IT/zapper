@@ -29,7 +29,7 @@ jobs:
           -PzapperVersionCode=${{ github.run_number }}
           -PzapperVersionName=0.1.${{ github.run_number }}
           -PzapperUpdateBaseUrl=${{ vars.ZAPPER_UPDATE_BASE_URL || 'https://verdonck-it.github.io/zapper/' }}
-          -PzapperPluginPublicKey=${{ vars.ZAPPER_PLUGIN_PUBLIC_KEY }}
+          -PzapperPluginPublicKey=${{ vars.ZAPPER_PLUGIN_PUBLIC_KEY || secrets.ZAPPER_PLUGIN_PUBLIC_KEY }}
           -PzapperKeystore=$RUNNER_TEMP/zapper.jks
           -PzapperKeystorePassword=${{ secrets.ZAPPER_KEYSTORE_PASSWORD }}
           -PzapperKeyAlias=${{ secrets.ZAPPER_KEY_ALIAS }}
