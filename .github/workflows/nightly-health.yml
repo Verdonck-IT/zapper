@@ -10,6 +10,9 @@ on:
 
 jobs:
   health:
+    # Enkel als er een runner thuis is: zet de repository-variabele HEALTH_RUNNER op "true".
+    # Zonder runner zou de job elke nacht in de wachtrij blijven hangen.
+    if: vars.HEALTH_RUNNER == 'true'
     runs-on: [self-hosted, zapper-be]
     strategy:
       fail-fast: false
@@ -33,6 +36,8 @@ jobs:
           # Env-namen kunnen geen expressies bevatten; daarom via U/P geëxporteerd.
           U: ${{ secrets[format('{0}_USERNAME', matrix.env)] }}
           P: ${{ secrets[format('{0}_PASSWORD', matrix.env)] }}
+          # Live tests (zonder login, bv. Focus & WTV) draaien enkel hier, niet in gewone CI.
+          LIVE_TESTS: "1"
         run: |
           export ${{ matrix.env }}_USERNAME="$U" ${{ matrix.env }}_PASSWORD="$P"
           ./gradlew :plugins:${{ matrix.plugin }}:test --tests '*ContractTest*' --rerun-tasks

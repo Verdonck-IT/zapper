@@ -13,6 +13,10 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+    env:
+      # Zonder API-sleutel kan de agent niet porten: dan enkel waarschuwen en de status NIET
+      # opschuiven, zodat de wijzigingen later (met sleutel) alsnog opgepikt worden.
+      HAS_AGENT_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
@@ -35,6 +39,10 @@ jobs:
               mkdir -p .github/agent/upstream-state && echo "$head" > "$state"
             elif [ "$old" != "$head" ]; then
               echo "$id: $old -> $head"
+              if [ "$HAS_AGENT_KEY" != "true" ]; then
+                echo "::warning title=Upstream gewijzigd ($id)::$repo heeft nieuwe commits ($old..$head), maar ANTHROPIC_API_KEY ontbreekt: niet automatisch geport."
+                continue
+              fi
               git clone --quiet "https://github.com/$repo.git" ".agent/upstream/$id"
               git -C ".agent/upstream/$id" diff "$old" "$head" -- resources/lib > ".agent/upstream/$id.diff"
               git -C ".agent/upstream/$id" log --oneline "$old..$head" > ".agent/upstream/$id.log"

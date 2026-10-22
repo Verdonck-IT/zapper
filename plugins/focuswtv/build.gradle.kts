@@ -14,6 +14,9 @@ dependencies {
 }
 
 tasks.test {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        // De live test hangt af van focus-wtv.be: in gewone CI overslaan, in de nachtelijke check (LIVE_TESTS=1) wel.
+        if (System.getenv("CI") != null && System.getenv("LIVE_TESTS") == null) excludeTags("live")
+    }
     testLogging { events("passed", "skipped", "failed"); showStandardStreams = true }
 }

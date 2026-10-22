@@ -16,6 +16,11 @@ env:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # gh-pages pushen met github.token (als er geen DIST_TOKEN is)
+    env:
+      # Zonder signeersleutel wordt er enkel gebouwd en getest, niet gepubliceerd.
+      HAS_SIGNING_KEY: ${{ secrets.PLUGIN_SIGNING_KEY != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -44,17 +49,31 @@ jobs:
             echo "$n: $(stat -c%s build/dex/$n.jar) bytes"
           done
 
-      - name: Dist-site uitchecken
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ vars.DIST_REPO || github.repository }}
-          ref: gh-pages
-          token: ${{ secrets.DIST_TOKEN || github.token }}
-          path: dist
+      - name: Publiceren overgeslagen (geen signeersleutel)
+        if: env.HAS_SIGNING_KEY != 'true'
+        run: |
+          echo "::notice title=Plugins niet gepubliceerd::Secret PLUGIN_SIGNING_KEY ontbreekt. Plugins zijn gebouwd, getest en naar DEX omgezet, maar niet gepubliceerd. Maak een sleutel met tools/signing/keygen.py (zie README)."
 
-      - run: pip install cryptography
+      - name: Dist-site uitchecken (gh-pages; wordt aangemaakt als ze nog niet bestaat)
+        if: env.HAS_SIGNING_KEY == 'true'
+        env:
+          TOKEN: ${{ secrets.DIST_TOKEN || github.token }}
+          REPO: ${{ vars.DIST_REPO || github.repository }}
+        run: |
+          url="https://x-access-token:${TOKEN}@github.com/${REPO}.git"
+          if git ls-remote --exit-code --heads "$url" gh-pages >/dev/null; then
+            git clone --quiet --depth 1 --branch gh-pages "$url" dist
+          else
+            git init --quiet dist
+            git -C dist checkout --quiet --orphan gh-pages
+            git -C dist remote add origin "$url"
+          fi
+
+      - if: env.HAS_SIGNING_KEY == 'true'
+        run: pip install cryptography
 
       - name: Publiceren en signeren
+        if: env.HAS_SIGNING_KEY == 'true'
         env:
           PLUGIN_SIGNING_KEY: ${{ secrets.PLUGIN_SIGNING_KEY }}
         run: |
@@ -69,6 +88,7 @@ jobs:
           done
 
       - name: Pushen
+        if: env.HAS_SIGNING_KEY == 'true'
         working-directory: dist
         run: |
           git config user.name "zapper-ci"
@@ -76,4 +96,4 @@ jobs:
           git add -A
           git diff --cached --quiet && { echo "Niets gewijzigd"; exit 0; }
           git commit -m "plugins: build ${{ github.run_number }} (${{ github.sha }})"
-          git push
+          git push origin gh-pages
