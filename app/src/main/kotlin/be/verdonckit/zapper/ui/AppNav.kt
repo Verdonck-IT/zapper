@@ -62,7 +62,6 @@ fun AppNav() {
                     context.graph.episodeSelection["$itemKey|${episode.playableId}"] = episode
                     nav.navigate("episode/${Uri.encode(itemKey)}/${Uri.encode(episode.playableId)}")
                 },
-                onBack = { nav.popBackStack() },
             )
         }
         composable("episode/{key}/{playable}") { entry ->
