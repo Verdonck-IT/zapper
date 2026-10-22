@@ -39,6 +39,24 @@ const flows = {
       await page.waitForTimeout(20000); // tokens, media-items, manifest, licentie
     },
   },
+  play: {
+    start: "https://www.play.tv/",
+    async login(page, user, pass) {
+      await clickFirst(page, ["#didomi-notice-agree-button", "button:has-text('Alles accepteren')", "button:has-text('Akkoord')"]);
+      await clickFirst(page, ["a:has-text('Aanmelden')", "button:has-text('Aanmelden')", "a[href*='login']"]);
+      await fillFirst(page, ["input[type=email]", "input[name=email]", "#email"], user);
+      await fillFirst(page, ["input[type=password]", "#password"], pass);
+      await clickFirst(page, ["button[type=submit]", "button:has-text('Aanmelden')", "button:has-text('Inloggen')"]);
+      await page.waitForTimeout(8000); // Cognito InitiateAuth + RespondToAuthChallenge
+    },
+    async browseAndPlay(page) {
+      await page.goto("https://www.play.tv/programmas", { waitUntil: "networkidle" }).catch(() => {});
+      await clickFirst(page, ["a[href*='/programmas/']:not([href$='/programmas'])"]);
+      await page.waitForLoadState("networkidle").catch(() => {});
+      await clickFirst(page, ["button:has-text('Kijk')", "a:has-text('Kijk')", "button:has-text('Afspelen')"]);
+      await page.waitForTimeout(20000); // api.play.tv videos, manifest, KeyOS-licentie
+    },
+  },
 };
 
 async function clickFirst(page, selectors) {

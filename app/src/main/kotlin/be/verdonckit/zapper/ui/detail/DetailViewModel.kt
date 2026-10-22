@@ -15,7 +15,12 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -59,6 +64,7 @@ data class DetailState(
     val episodes: List<Episode> get() = seasons.getOrNull(selectedSeason)?.episodes.orEmpty()
 }
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class DetailViewModel(private val graph: AppGraph, itemKey: String) : ViewModel() {
 
     private val _state = MutableStateFlow(DetailState())
@@ -70,7 +76,9 @@ class DetailViewModel(private val graph: AppGraph, itemKey: String) : ViewModel(
 
     init {
         viewModelScope.launch {
-            val item = graph.dao.item(itemKey) ?: return@launch _state.update { it.copy(loading = false, error = "Titel niet gevonden") }
+            // Niet in de index (bv. enkel in "Mijn lijst")? Dan met de gegevens uit Mijn lijst.
+            val item = graph.dao.item(itemKey) ?: graph.dao.myListEntry(itemKey)?.toItem()
+                ?: return@launch _state.update { it.copy(loading = false, error = "Titel niet gevonden") }
             val alternatives = graph.dao.sameTitle(item.dedupKey)
             _state.update { it.copy(item = item, alternatives = alternatives, description = item.description) }
             load(item)
@@ -258,6 +266,21 @@ class DetailViewModel(private val graph: AppGraph, itemKey: String) : ViewModel(
             val eps = seasons[i].episodes
             val sorted = if (eps.isNotEmpty() && eps.all { it.episodeNumber != null }) eps.sortedBy { it.episodeNumber } else eps
             sorted.map { i to it }
+        }
+    }
+
+    /** "Mijn lijst" van het platform; volgt de lokale tabel, dus ook wijzigingen van elders. */
+    val inMyList = _state.flatMapLatest { s -> s.item?.let { graph.dao.isInMyList(it.key) } ?: flowOf(false) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    fun supportsMyList(): Boolean =
+        _state.value.item?.let { graph.plugins.get(it.providerId)?.provider?.info?.supportsMyList } == true
+
+    fun toggleMyList() {
+        val item = _state.value.item ?: return
+        viewModelScope.launch {
+            val error = graph.myListSync.set(item, !inMyList.value)
+            if (error != null) _state.update { it.copy(error = error) }
         }
     }
 

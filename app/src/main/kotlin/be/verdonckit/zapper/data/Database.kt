@@ -82,6 +82,35 @@ data class RemoteContinueEntity(
     val fetchedAt: Long,
 )
 
+/**
+ * "Mijn lijst" van een platform. Bevat genoeg om de titel te tonen en te openen, ook als die
+ * (nog) niet in de catalogus-index zit. Per provider vervangen bij elke verversing.
+ */
+@Entity(tableName = "my_list", primaryKeys = ["key"], indices = [Index("providerId")])
+data class MyListEntity(
+    /** Zelfde sleutel als [ItemEntity.key]: "<providerId>:<itemId>". */
+    val key: String,
+    val providerId: String,
+    val itemId: String,
+    val kind: String,
+    val title: String,
+    val description: String?,
+    val posterUrl: String?,
+    val backdropUrl: String?,
+    val logoUrl: String?,
+    val playableId: String?,
+    val sortOrder: Int,
+    val addedAt: Long,
+) {
+    fun toItem(): ItemEntity = ItemEntity(
+        key = key, providerId = providerId, itemId = itemId, kind = kind, title = title, description = description,
+        posterUrl = posterUrl, backdropUrl = backdropUrl, logoUrl = logoUrl, playableId = playableId, year = null,
+        dedupKey = "mylist|$key", rank = sortOrder, syncedAt = addedAt,
+    )
+}
+
+data class KeyTitle(val key: String, val title: String)
+
 @Dao
 interface CatalogDao {
 
@@ -109,6 +138,10 @@ interface CatalogDao {
 
     @Query("SELECT * FROM items WHERE key = :key")
     suspend fun item(key: String): ItemEntity?
+
+    /** Om programma's terug te vinden op titel (bv. "Kijk verder"-kaarten zonder programma-id). */
+    @Query("SELECT key, title FROM items WHERE providerId = :providerId")
+    suspend fun titlesFor(providerId: String): List<KeyTitle>
 
     @Query("SELECT * FROM items WHERE dedupKey = :dedupKey ORDER BY providerId")
     suspend fun sameTitle(dedupKey: String): List<ItemEntity>
@@ -177,6 +210,32 @@ interface CatalogDao {
     )
     fun continueWatching(): Flow<List<ProgressEntity>>
 
+    // ---- Mijn lijst ----
+
+    @Query("SELECT * FROM my_list ORDER BY addedAt DESC, sortOrder")
+    fun myList(): Flow<List<MyListEntity>>
+
+    @Query("SELECT * FROM my_list WHERE key = :key")
+    suspend fun myListEntry(key: String): MyListEntity?
+
+    @Query("SELECT EXISTS(SELECT 1 FROM my_list WHERE key = :key)")
+    fun isInMyList(key: String): Flow<Boolean>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertMyList(entries: List<MyListEntity>)
+
+    @Query("DELETE FROM my_list WHERE key = :key")
+    suspend fun deleteMyList(key: String)
+
+    @Query("DELETE FROM my_list WHERE providerId = :providerId")
+    suspend fun deleteMyListFor(providerId: String)
+
+    @Transaction
+    suspend fun replaceMyList(providerId: String, entries: List<MyListEntity>) {
+        deleteMyListFor(providerId)
+        insertMyList(entries)
+    }
+
     // ---- "verder kijken" van de platformen ----
 
     @Query("SELECT * FROM remote_continue ORDER BY sortOrder")
@@ -199,10 +258,10 @@ interface CatalogDao {
 }
 
 @Database(
-    entities = [ItemEntity::class, ItemCategoryEntity::class, ProgressEntity::class, RemoteContinueEntity::class],
-    version = 3,
+    entities = [ItemEntity::class, ItemCategoryEntity::class, ProgressEntity::class, RemoteContinueEntity::class, MyListEntity::class],
+    version = 4,
     exportSchema = true,
-    autoMigrations = [AutoMigration(from = 2, to = 3)],
+    autoMigrations = [AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4)],
 )
 abstract class ZapperDatabase : RoomDatabase() {
     abstract fun catalog(): CatalogDao

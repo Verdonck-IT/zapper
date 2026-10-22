@@ -48,6 +48,8 @@ import be.verdonckit.zapper.graph
 import be.verdonckit.zapper.player.PlayerActivity
 import be.verdonckit.zapper.ui.components.BackToTop
 import be.verdonckit.zapper.ui.components.ContentCard
+import be.verdonckit.zapper.ui.components.DefaultScrollInside
+import be.verdonckit.zapper.ui.components.PivotToTop
 import be.verdonckit.zapper.ui.components.HeroBackdrop
 import be.verdonckit.zapper.ui.components.HeroInfo
 import be.verdonckit.zapper.ui.components.Sidebar
@@ -135,7 +137,9 @@ fun HomeScreen(onOpen: (ItemEntity) -> Unit, onNavigate: (SidebarDestination) ->
                     logoUrl = hero.logoUrl,
                     description = hero.description,
                     providerLabel = state.providerNames[hero.providerId],
-                    modifier = Modifier.padding(start = 56.dp, top = 24.dp).height(220.dp),
+                    // Vaste hoogte (rijen springen niet bij elke focuswissel), maar zonder lege band eronder.
+                    modifier = Modifier.padding(start = 56.dp, top = 12.dp, bottom = 8.dp).height(184.dp),
+                    descriptionLines = 2,
                 )
             }
 
@@ -143,6 +147,7 @@ fun HomeScreen(onOpen: (ItemEntity) -> Unit, onNavigate: (SidebarDestination) ->
                 EmptyState { onNavigate(SidebarDestination.SETTINGS) }
             }
 
+            PivotToTop(leading = 48.dp) { defaultScroll ->
             LazyColumn(
                 state = listState,
                 contentPadding = PaddingValues(bottom = 48.dp),
@@ -158,6 +163,7 @@ fun HomeScreen(onOpen: (ItemEntity) -> Unit, onNavigate: (SidebarDestination) ->
                             color = MaterialTheme.colorScheme.onBackground,
                             modifier = Modifier.padding(start = 56.dp, bottom = 10.dp),
                         )
+                        DefaultScrollInside(defaultScroll) {
                         LazyRow(
                             state = if (rowIndex == 0) firstRowState else ownRowState,
                             contentPadding = PaddingValues(horizontal = 56.dp, vertical = 8.dp),
@@ -183,8 +189,10 @@ fun HomeScreen(onOpen: (ItemEntity) -> Unit, onNavigate: (SidebarDestination) ->
                                 if (isFirst) cardFocus[cardKey] = firstCard
                             }
                         }
+                        }
                     }
                 }
+            }
             }
         }
 

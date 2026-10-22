@@ -2,7 +2,7 @@
   "_doc": [
     "Eigen taxonomie, afgestemd op Vlaamse tv. Volgorde van 'categories' = volgorde van de rijen op het startscherm.",
     "Toekennen gebeurt in deze volgorde:",
-    "  1. 'titles': vaste titels (bv. dagelijkse soaps) - wint altijd",
+    "  1. 'titles': vaste titels (bv. Thuis -> Fictie) - wint altijd",
     "  2. 'providers': native categorie van de zender -> eigen categorieën",
     "  3. 'keywords': trefwoorden in titel + omschrijving (aanvullend)",
     "  4. 'rules': opkuis, bv. true crime niet ook in fictie-crime, kids niet in volwassen rijen",
@@ -12,7 +12,6 @@
   "categories": [
     { "id": "popular",   "name": "Moet je nu zien" },
     { "id": "live",      "name": "Live tv" },
-    { "id": "soaps",     "name": "Dagelijkse reeksen" },
     { "id": "drama",     "name": "Fictie" },
     { "id": "crime",     "name": "Crime & thriller" },
     { "id": "comedy",    "name": "Humor & sitcoms" },
@@ -33,9 +32,9 @@
   ],
 
   "titles": {
-    "thuis": ["soaps"],
-    "familie": ["soaps"],
-    "lisa": ["soaps"],
+    "thuis": ["drama"],
+    "familie": ["drama"],
+    "lisa": ["drama"],
     "dagelijkse kost": ["lifestyle"],
     "de afspraak": ["talk", "news"],
     "terzake": ["news"],
@@ -68,13 +67,40 @@
       "wetenschap-en-natuur": ["nature"],
       "levensbeschouwing": ["docu"]
     },
+    "play": {
+      "populair": ["popular"],
+      "live": ["live"],
+      "film": ["films"],
+      "fictie": ["drama"],
+      "drama": ["drama"],
+      "actie": ["drama"],
+      "misdaad": ["crime"],
+      "thriller": ["crime"],
+      "docu": ["docu"],
+      "human-interest": ["docu"],
+      "reality": ["reality"],
+      "entertainment": ["reality"],
+      "humor": ["comedy"],
+      "komedie": ["comedy"],
+      "spelprogramma": ["games"],
+      "koken": ["lifestyle"],
+      "food": ["lifestyle"],
+      "lifestyle": ["lifestyle"],
+      "huizen": ["lifestyle"],
+      "make-over": ["lifestyle"],
+      "actua-sport": ["sport"],
+      "brand-play-crime": ["crime"],
+      "brand-play-reality": ["reality"],
+      "brand-play-fictie": ["drama"],
+      "brand-play-actie": ["drama"],
+      "brand-njam": ["lifestyle"]
+    },
     "vtmgo": {},
     "play": {},
     "focuswtv": {}
   },
 
   "keywords": {
-    "soaps": ["dagelijkse reeks", "soap"],
     "crime": ["moord", "rechercheur", "recherche", "speurder", "detective", "thriller", "misdaad", "commissaris", "onderzoeksrechter", "seriemoordenaar"],
     "comedy": ["komedie", "sitcom", "sketch", "humor", "comedy", "satire"],
     "games": ["quiz", "spelprogramma", "kandidaten strijden", "kandidaten nemen het op", "spelshow"],
@@ -93,8 +119,6 @@
   "rules": [
     { "_doc": "Misdaad in een docu = true crime, niet in de fictierij",
       "when": ["crime", "docu"], "add": ["truecrime"], "remove": ["crime"] },
-    { "_doc": "Soaps staan in hun eigen rij, niet nog eens in Fictie",
-      "when": ["soaps"], "remove": ["drama"] },
     { "_doc": "Crime- en comedyreeksen niet dubbel in de algemene fictierij",
       "when": ["drama", "crime"], "remove": ["drama"] },
     { "when": ["drama", "comedy"], "remove": ["drama"] },

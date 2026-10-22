@@ -101,6 +101,11 @@ fun DetailScreen(itemKey: String, onOpenEpisode: (itemKey: String, episode: Epis
                     modifier = Modifier.focusRequester(playFocus).onFocusChanged { playFocused = it.isFocused },
                 ) { Text(label) }
 
+                if (vm.supportsMyList()) {
+                    val inList by vm.inMyList.collectAsStateWithLifecycle()
+                    OutlinedButton(onClick = vm::toggleMyList) { Text(if (inList) "✓  In mijn lijst" else "＋  Mijn lijst") }
+                }
+
                 // Zelfde titel bij een andere zender? Laat kiezen waar je kijkt.
                 state.alternatives.filter { it.key != item?.key }.forEach { alt ->
                     OutlinedButton(onClick = { vm.switchProvider(alt) }) {

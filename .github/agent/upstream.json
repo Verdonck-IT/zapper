@@ -1,6 +1,19 @@
 {
   "vrtmax": {
     "repo": "add-ons/plugin.video.vrt.nu",
-    "relevant": ["resources/lib/tokenresolver.py", "resources/lib/streamservice.py", "resources/lib/api.py", "resources/lib/graphql_data.py"]
+    "relevant": [
+      "resources/lib/tokenresolver.py",
+      "resources/lib/streamservice.py",
+      "resources/lib/api.py",
+      "resources/lib/graphql_data.py"
+    ]
+  },
+  "play": {
+    "repo": "add-ons/plugin.video.play",
+    "relevant": [
+      "resources/lib/play/auth.py",
+      "resources/lib/play/aws/cognito_idp.py",
+      "resources/lib/play/content.py"
+    ]
   }
 }

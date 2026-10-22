@@ -33,8 +33,16 @@ Klaar:
 - Zoekscherm: zoekbalk + categoriefilters + raster A–Z, accentongevoelig, lokaal op de Room-index.
 - Startscherm: sidebar (Home, Zoeken, Live tv, Instellingen) via ◀ op de linkerrand of terug bovenaan; terug sluit de app nooit.
 - Live tv: eigen pagina met officiële zenderlogo's (VRT `brandLogos`, dag gecachet, vaste URL als terugval).
+- Mijn lijst (provider-api v3: `supportsMyList`, `myList()`, `setInMyList()`): VRT MAX via favorieten (GraphQL `setFavorite`),
+  Play via `/tv/v1/programs/myList`. Rij op het startscherm, eigen pagina in de sidebar, knop op de detailpagina.
+  Lezen live getest (VRT: 20 favorieten); toevoegen/verwijderen bij het platform niet automatisch getest.
+- "Verder kijken" opent altijd eerst het programma; ontbreekt het programma-id, dan zoekt `ProgressSync` het op titel.
 - Inactiviteit (`core/IdleController.kt`): 5 min (gepauzeerd: 3 min) → OLED-veilige screensaver; 15 min later scherm loslaten
   → systeemslaap. Tijdens afspelen nooit.
+- Play-plugin (`plugins/play`, vroeger GoPlay): Cognito-SRP-login (bit voor bit getest tegen de Python-code van
+  add-ons/plugin.video.play), A–Z-catalogus zonder Play Kinepolis (huren/kopen), details met liggend beeld en genres,
+  "Moet je zien" en "Kijk verder" van de homepage, live-zenders, streams met Widevine via KeyOS (`customdata`-header).
+  Publieke delen live getest (636 programma's, live-zenders); login, afleveringen, streams en voortgang NIET (geen account).
 - Beelden: fallback-keten (liggend → staand → titel-art → gegenereerde titelkaart in merkkleur).
 
 Geverifieerd: provider-api + VRT-plugin + testkit compileren (Kotlin 2.1); cookie-jar; ECDSA-signatuur Python→Java;
@@ -52,9 +60,9 @@ Volgende stappen (in deze volgorde):
 1. ~~`./gradlew :app:assembleDebug` laten slagen.~~ Klaar.
 2. ~~Live contracttest VRT MAX.~~ Klaar, alle stappen groen.
 3. TMDB-verrijking (enkel aanvullen: ontbrekende beelden, jaar, omschrijving; koppelen op titel+jaar+type, gecachet per dedupKey; bij twijfel niet koppelen). Gebruiker moet nog een TMDB API-sleutel aanmaken. Geen AI voor categorieën (bewuste keuze).
-4. Plugins VTM GO, Play, Focus & WTV (stappen in README).
+4. Plugins VTM GO en Focus & WTV (stappen in README). Play: live contracttest met `PLAY_USERNAME/PASSWORD`.
 
 ## Testen
 - `./gradlew test` – unit tests; contracttests worden overgeslagen zonder credentials.
 - Live: `VRTMAX_USERNAME=… VRTMAX_PASSWORD=… ./gradlew :plugins:vrtmax:test`
-  → rapport in `plugins/vrtmax/build/health/vrtmax.json`.
+  → rapport in `plugins/vrtmax/build/health/vrtmax.json`. Zelfde voor Play met `PLAY_USERNAME/PLAY_PASSWORD` en `:plugins:play:test`.

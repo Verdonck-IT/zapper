@@ -144,9 +144,14 @@ class HomeViewModel(private val graph: AppGraph) : ViewModel() {
             .take(30)
     }
 
-    val state: StateFlow<HomeState> = combine(continueRow, categoryRows, graph.plugins.plugins) { cont, rows, plugins ->
+    /** "Mijn lijst" van alle platformen samen, meest recent toegevoegd eerst. */
+    private val myListRow = dao.myList().map { list ->
+        HomeRow(MY_LIST_ROW, "Mijn lijst", list.map { tile(it.toItem()) })
+    }
+
+    val state: StateFlow<HomeState> = combine(continueRow, myListRow, categoryRows, graph.plugins.plugins) { cont, myList, rows, plugins ->
         HomeState(
-            rows = (listOf(cont) + rows).filter { it.tiles.isNotEmpty() },
+            rows = (listOf(cont, myList) + rows).filter { it.tiles.isNotEmpty() },
             providerNames = plugins.mapValues { it.value.name },
             providerColors = plugins.mapValues { it.value.provider.info.brandColor },
             loading = false,
@@ -156,6 +161,7 @@ class HomeViewModel(private val graph: AppGraph) : ViewModel() {
     /** Bij terugkeer naar het startscherm: "Verder kijken" opnieuw bij de platformen ophalen. */
     fun refreshContinue(force: Boolean = false) {
         viewModelScope.launch { graph.progressSync.refresh(force) }
+        viewModelScope.launch { graph.myListSync.refresh(force) }
     }
 
     private fun tile(e: ItemEntity) = Tile(
@@ -173,6 +179,7 @@ class HomeViewModel(private val graph: AppGraph) : ViewModel() {
 
     companion object {
         const val LIVE_CATEGORY = "live"
+        const val MY_LIST_ROW = "mylist"
 
         fun episodeCode(season: Int?, episode: Int?): String? = when {
             season != null && episode != null -> "S$season A$episode"

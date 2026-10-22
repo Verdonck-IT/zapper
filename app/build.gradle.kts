@@ -42,7 +42,11 @@ android {
         debug {
             applicationIdSuffix = ".debug"
             // In debug worden plugins rechtstreeks van het classpath geladen (geen DEX/download nodig).
-            buildConfigField("String", "DEV_PLUGINS", "\"be.verdonckit.zapper.plugins.vrtmax.VrtMaxProvider\"")
+            buildConfigField(
+                "String",
+                "DEV_PLUGINS",
+                "\"be.verdonckit.zapper.plugins.vrtmax.VrtMaxProvider,be.verdonckit.zapper.plugins.play.PlayProvider\"",
+            )
         }
         release {
             isMinifyEnabled = false // R8 zou provider-api-klassen strippen die enkel plugins gebruiken
@@ -62,6 +66,10 @@ android {
         compose = true
         buildConfig = true
     }
+    packaging {
+        // Elke dev-plugin draagt een eigen manifest; enkel CI (plugins.yml) leest het, uit de bronmap.
+        resources.excludes += "zapper-plugin.properties"
+    }
 }
 
 ksp {
@@ -71,6 +79,7 @@ ksp {
 dependencies {
     implementation(project(":provider-api"))
     debugImplementation(project(":plugins:vrtmax"))
+    debugImplementation(project(":plugins:play"))
 
     implementation(libs.kotlinx.coroutines.android)
 

@@ -25,7 +25,7 @@ import java.util.Base64
 
 class VrtMaxProvider : StreamingProvider {
 
-    override val info = ProviderInfo(id = "vrtmax", displayName = "VRT MAX", brandColor = 0xFF00D1A7, syncsProgress = true)
+    override val info = ProviderInfo(id = "vrtmax", displayName = "VRT MAX", brandColor = 0xFF00D1A7, syncsProgress = true, supportsMyList = true)
 
     private lateinit var host: HostServices
     private lateinit var auth: VrtAuth
@@ -272,6 +272,38 @@ class VrtMaxProvider : StreamingProvider {
         if (resp.code !in 200..299) throw ProviderException(ErrorKind.API_CHANGED, "resumePoints: HTTP ${resp.code}")
     }
 
+    // ---------- Mijn lijst ----------
+
+    /** De lijst "Mijn lijst" (favoriete programma's) van VRT MAX. */
+    override suspend fun myList(): List<CatalogItem> {
+        val out = mutableListOf<CatalogItem>()
+        var cursor: String? = null
+        var pages = 0
+        do {
+            val vars = "{\"listId\":${jsonString(MY_LIST_ID)},\"lazyItemCount\":$PAGE_SIZE" +
+                (cursor?.let { ",\"after\":${jsonString(it)}" } ?: "") + "}"
+            val conn = api.graphql("TileList", VrtQueries.TILE_LIST, vars).path("list", "paginatedItems")
+                ?: throw ProviderException(ErrorKind.API_CHANGED, "Mijn lijst zonder paginatedItems")
+            out += conn.arr("edges").objects().mapNotNull { it.obj("node") }
+                .filter { it.str("__typename") == "ProgramTile" }
+                .mapNotNull { programTile(it, null) }
+            cursor = nextCursor(conn)
+            pages++
+        } while (cursor != null && pages < 4)
+        return out.distinctBy { it.id }
+    }
+
+    override suspend fun setInMyList(itemId: String, inList: Boolean) {
+        val data = api.graphql("ProgramFavorite", VrtQueries.PROGRAM_FAVORITE, "{\"pageId\":${jsonString("/vrtmax/a-z/$itemId/")}}")
+        val favoriteId = data.path("page", "header")?.arr("actionItems")?.objects()
+            ?.mapNotNull { it.obj("action") }
+            ?.firstOrNull { it.str("__typename") == "FavoriteAction" }
+            ?.str("id")
+            ?: throw ProviderException(ErrorKind.API_CHANGED, "geen Mijn lijst-knop voor $itemId")
+        val vars = "{\"input\":{\"favorite\":$inList,\"id\":${jsonString(favoriteId)}}}"
+        api.graphql("setFavorite", VrtQueries.SET_FAVORITE, vars)
+    }
+
     private fun watchProgress(p: JSONObject?): WatchProgress? {
         if (p == null || !p.has("progressInSeconds")) return null
         val pos = p.optInt("progressInSeconds", 0)
@@ -355,6 +387,10 @@ class VrtMaxProvider : StreamingProvider {
         private const val RESUME_POINTS_URL = "https://ddt.profiel.vrt.be/resumePoints"
         private const val EXTRA_MEDIA_ID = "resumeMediaId"
         private const val EXTRA_MEDIA_NAME = "resumeMediaName"
+
+        /** "Mijn lijst": favoriete programma's (zelfde id als de Kodi-add-on). */
+        private val MY_LIST_ID =
+            "$" + Base64.getEncoder().encodeToString("o%25|o%9||p%/mijn-lijst/%|video-program|b%1%".toByteArray(Charsets.UTF_8))
 
         /** "Programma's verder kijken" op de VRT MAX-homepage (zelfde id als de Kodi-add-on). */
         private val CONTINUE_LIST_ID =

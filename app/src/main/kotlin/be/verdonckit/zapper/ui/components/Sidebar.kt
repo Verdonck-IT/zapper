@@ -44,6 +44,7 @@ import be.verdonckit.zapper.ui.theme.ZapperColors
 enum class SidebarDestination(val label: String, val icon: String) {
     HOME("Home", "⌂"),
     SEARCH("Zoeken", "⌕"),
+    MY_LIST("Mijn lijst", "＋"),
     LIVE("Live tv", "●"),
     SETTINGS("Instellingen", "⚙"),
 }

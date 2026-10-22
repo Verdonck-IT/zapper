@@ -11,7 +11,7 @@ on:
 concurrency: publish-dist
 
 env:
-  PROVIDER_API_VERSION: 2 # moet gelijk zijn aan PROVIDER_API_VERSION in provider-api
+  PROVIDER_API_VERSION: 3 # moet gelijk zijn aan PROVIDER_API_VERSION in provider-api
 
 jobs:
   publish:

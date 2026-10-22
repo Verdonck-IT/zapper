@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -71,13 +72,18 @@ fun SearchScreen(onOpen: (ItemEntity) -> Unit, onBack: () -> Unit) {
     val grid = rememberLazyGridState()
     var focused by remember { mutableStateOf<ItemEntity?>(null) }
     var fieldFocused by remember { mutableStateOf(false) }
+    // De focus start op de filters, niet in de zoekbalk: zo komt het toetsenbord niet ongevraagd op.
+    val chipFocus = remember { HashMap<String, FocusRequester>() }
+    val filterRow = rememberLazyListState()
+    var filtersFocused by remember { mutableStateOf(false) }
+    fun selectedChip() = chipFocus[state.category ?: ALL_CHIP] ?: chipFocus[ALL_CHIP]
 
     // Terug in de resultaten: eerst naar boven en in de zoekbalk, dan pas terug naar het startscherm.
     BackToTop(
-        atTop = { fieldFocused },
+        atTop = { filtersFocused || fieldFocused },
         toTop = {
             grid.scrollToItem(0)
-            fieldFocus.requestFocusAfterLayout()
+            selectedChip()?.requestFocusAfterLayout()
         },
         onBackAtTop = onBack,
     )
@@ -95,12 +101,21 @@ fun SearchScreen(onOpen: (ItemEntity) -> Unit, onBack: () -> Unit) {
         )
 
         Spacer(Modifier.height(16.dp))
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(vertical = 4.dp)) {
-            item(key = "all") {
-                FilterChip("Alles", selected = state.category == null) { vm.setCategory(null) }
+        LazyRow(
+            state = filterRow,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            contentPadding = PaddingValues(vertical = 4.dp),
+            modifier = Modifier.onFocusChanged { filtersFocused = it.hasFocus },
+        ) {
+            item(key = ALL_CHIP) {
+                FilterChip("Alles", selected = state.category == null, Modifier.focusRequester(chipFocus.getOrPut(ALL_CHIP) { FocusRequester() })) {
+                    vm.setCategory(null)
+                }
             }
             items(state.categories, key = { it.id }) { cat ->
-                FilterChip(cat.name, selected = state.category == cat.id) { vm.setCategory(cat.id) }
+                FilterChip(cat.name, selected = state.category == cat.id, Modifier.focusRequester(chipFocus.getOrPut(cat.id) { FocusRequester() })) {
+                    vm.setCategory(cat.id)
+                }
             }
         }
 
@@ -152,8 +167,10 @@ fun SearchScreen(onOpen: (ItemEntity) -> Unit, onBack: () -> Unit) {
         }
     }
 
-    LaunchedEffect(Unit) { runCatching { fieldFocus.requestFocus() } }
+    LaunchedEffect(Unit) { chipFocus[ALL_CHIP]?.requestFocusAfterLayout() }
 }
+
+private const val ALL_CHIP = "all"
 
 @Composable
 private fun SearchField(
@@ -189,9 +206,10 @@ private fun SearchField(
 }
 
 @Composable
-private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun FilterChip(label: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Button(
         onClick = onClick,
+        modifier = modifier,
         colors = if (selected) ButtonDefaults.colors() else ButtonDefaults.colors(
             containerColor = ZapperColors.Surface,
             contentColor = ZapperColors.TextSecondary,

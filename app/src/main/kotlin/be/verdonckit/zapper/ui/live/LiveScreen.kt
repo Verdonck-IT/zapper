@@ -22,6 +22,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -72,7 +73,9 @@ fun LiveScreen(onBack: () -> Unit) {
             modifier = Modifier.fillMaxSize(),
         ) {
             itemsIndexed(channels, key = { _, ch -> ch.key }) { index, ch ->
-                val brand = plugins[ch.providerId]?.provider?.info?.brandColor?.let { Color(it) } ?: ZapperColors.Surface
+                // Bijna zwart met een vleugje merkkleur: zenderlogo's (vaak in de merkkleur zelf) blijven leesbaar.
+                val brand = plugins[ch.providerId]?.provider?.info?.brandColor
+                    ?.let { lerp(Color(it), Color.Black, 0.82f) } ?: ZapperColors.Surface
                 Column {
                     ContentCard(
                         title = ch.title,

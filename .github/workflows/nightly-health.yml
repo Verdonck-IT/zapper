@@ -17,6 +17,8 @@ jobs:
         include:
           - plugin: vrtmax
             env: VRTMAX
+          - plugin: play
+            env: PLAY
           # Nieuwe provider? Voeg hier een regel toe + de secrets <ENV>_USERNAME/_PASSWORD.
     steps:
       - uses: actions/checkout@v4

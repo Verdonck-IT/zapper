@@ -257,6 +257,7 @@ fun HeroInfo(
     description: String?,
     providerLabel: String?,
     modifier: Modifier = Modifier,
+    descriptionLines: Int = 3,
 ) {
     var logoFailed by remember(logoUrl) { mutableStateOf(logoUrl.isNullOrBlank()) }
     Column(modifier.width(560.dp)) {
@@ -287,7 +288,7 @@ fun HeroInfo(
                 description,
                 style = MaterialTheme.typography.bodyLarge,
                 color = ZapperColors.TextSecondary,
-                maxLines = 3,
+                maxLines = descriptionLines,
                 overflow = TextOverflow.Ellipsis,
             )
         }

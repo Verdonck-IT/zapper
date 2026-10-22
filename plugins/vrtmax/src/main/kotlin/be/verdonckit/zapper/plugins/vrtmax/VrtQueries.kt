@@ -115,6 +115,27 @@ internal object VrtQueries {
         }
     """
 
+    /** De knop "Mijn lijst" op de programmapagina: het id is nodig voor setFavorite. */
+    val PROGRAM_FAVORITE = """
+        query ProgramFavorite(${'$'}pageId: ID!) {
+          page(id: ${'$'}pageId) {
+            ... on ProgramPage {
+              header { actionItems { action { __typename ... on FavoriteAction { id favorite } } } }
+            }
+          }
+        }
+    """
+
+    /** Zelfde mutatie als de website en de Kodi-add-on. */
+    val SET_FAVORITE = """
+        mutation setFavorite(${'$'}input: FavoriteActionInput!) {
+          setFavorite(input: ${'$'}input) {
+            __typename
+            actionItem { action { __typename ... on FavoriteAction { id favorite } } }
+          }
+        }
+    """
+
     /** Homepage-componenten: hieruit halen we de lijst "Populair" (of de eerste programmalijst). */
     val HOME_LISTS = """
         query Page(${'$'}pageId: ID!, ${'$'}componentCount: Int = 50) {

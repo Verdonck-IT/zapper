@@ -13,6 +13,8 @@ data class ProviderInfo(
      * "Verder kijken" en bekeken afleveringen.
      */
     val syncsProgress: Boolean = false,
+    /** True = de plugin implementeert [StreamingProvider.myList] en [StreamingProvider.setInMyList]. */
+    val supportsMyList: Boolean = false,
 )
 
 data class Credentials(val username: String, val password: String)

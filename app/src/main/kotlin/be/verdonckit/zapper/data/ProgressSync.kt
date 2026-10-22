@@ -35,13 +35,19 @@ class ProgressSync(private val dao: CatalogDao, private val plugins: PluginManag
     private suspend fun refreshOne(plugin: LoadedPlugin, now: Long) {
         val p = plugin.provider
         if (!p.isLoggedIn()) return
+        // Programma terugvinden op titel als het platform geen (gekend) programma-id meegeeft,
+        // zodat "Verder kijken" altijd eerst het programma opent, net als bij andere zenders.
+        var byTitle: Map<String, String>? = null
+        suspend fun keyForTitle(title: String): String? =
+            (byTitle ?: titleIndex(plugin.id).also { byTitle = it })[CategoryMapper.normalize(title)]
         val entries = p.continueWatching().mapIndexed { index, e ->
             val ep = e.episode
+            val direct = e.itemId?.let { "${plugin.id}:$it" }?.takeIf { dao.item(it) != null }
             RemoteContinueEntity(
                 playableKey = "${plugin.id}:${ep.playableId}",
                 providerId = plugin.id,
                 playableId = ep.playableId,
-                itemKey = e.itemId?.let { "${plugin.id}:$it" },
+                itemKey = direct ?: keyForTitle(e.itemTitle) ?: e.itemId?.let { "${plugin.id}:$it" },
                 itemTitle = e.itemTitle,
                 episodeTitle = ep.title,
                 imageUrl = ep.imageUrl,
@@ -55,6 +61,9 @@ class ProgressSync(private val dao: CatalogDao, private val plugins: PluginManag
         }.distinctBy { it.playableKey }
         dao.replaceRemoteContinue(plugin.id, entries)
     }
+
+    private suspend fun titleIndex(providerId: String): Map<String, String> =
+        dao.titlesFor(providerId).associate { CategoryMapper.normalize(it.title) to it.key }
 
     /** Voortgang terugmelden aan het platform. Fouten breken het afspelen nooit. */
     suspend fun report(plugin: LoadedPlugin, stream: StreamInfo, playableId: String, positionMs: Long, durationMs: Long) {

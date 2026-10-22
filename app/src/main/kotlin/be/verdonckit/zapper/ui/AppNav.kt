@@ -15,6 +15,7 @@ import be.verdonckit.zapper.graph
 import be.verdonckit.zapper.ui.components.SidebarDestination
 import be.verdonckit.zapper.ui.detail.DetailScreen
 import be.verdonckit.zapper.ui.live.LiveScreen
+import be.verdonckit.zapper.ui.mylist.MyListScreen
 import be.verdonckit.zapper.ui.detail.EpisodeScreen
 import be.verdonckit.zapper.ui.home.HomeScreen
 import be.verdonckit.zapper.ui.search.SearchScreen
@@ -48,6 +49,7 @@ fun AppNav() {
                         SidebarDestination.HOME -> Unit
                         SidebarDestination.SEARCH -> nav.navigate("search")
                         SidebarDestination.LIVE -> nav.navigate("live")
+                        SidebarDestination.MY_LIST -> nav.navigate("mylist")
                         SidebarDestination.SETTINGS -> nav.navigate("settings")
                     }
                 },
@@ -71,6 +73,7 @@ fun AppNav() {
             )
         }
         composable("live") { LiveScreen(onBack = { nav.popBackStack() }) }
+        composable("mylist") { MyListScreen(onOpen = ::open, onBack = { nav.popBackStack() }) }
         composable("search") { SearchScreen(onOpen = ::open, onBack = { nav.popBackStack() }) }
         composable("settings") { SettingsScreen(onBack = { nav.popBackStack() }) }
     }
