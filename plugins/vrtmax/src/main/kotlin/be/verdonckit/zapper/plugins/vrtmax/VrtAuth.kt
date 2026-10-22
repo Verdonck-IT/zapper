@@ -34,7 +34,13 @@ internal class VrtAuth(private val host: HostServices) {
 
     // ---------- Login ----------
 
-    suspend fun login(creds: Credentials): LoginResult {
+    suspend fun login(creds: Credentials): LoginResult =
+        performLogin(creds).also { r ->
+            if (r is LoginResult.Success) store.remove(AUTO_LOGIN_BLOCKED_UNTIL)
+            else store.put(AUTO_LOGIN_BLOCKED_UNTIL, (host.nowMillis() + AUTO_LOGIN_COOLDOWN_MS).toString())
+        }
+
+    private suspend fun performLogin(creds: Credentials): LoginResult {
         http.clearCookies()
         try {
             val init = http.get(SSO_INIT, followRedirects = false)
@@ -47,6 +53,13 @@ internal class VrtAuth(private val host: HostServices) {
 
             val payload = "{\"clientId\":\"vrtnu-site\",\"loginID\":${jsonString(creds.username)},\"password\":${jsonString(creds.password)}}"
             val resp = http.postJson(SSO_LOGIN, payload, headers = mapOf("OIDCXSRF" to xsrf))
+            // Te veel logins kort na elkaar: VRT antwoordt dan met 5xx of 429 (tijdelijk, geen API-wijziging).
+            if (resp.code >= 500 || resp.code == 429) {
+                return LoginResult.Failure(
+                    LoginFailure.NETWORK,
+                    "VRT-login tijdelijk niet beschikbaar (HTTP ${resp.code}). Probeer over enkele minuten opnieuw.",
+                )
+            }
             val json = runCatching { JSONObject(resp.text()) }.getOrNull()
                 ?: return apiChanged("perform_login gaf geen JSON (HTTP ${resp.code})")
 
@@ -108,6 +121,11 @@ internal class VrtAuth(private val host: HostServices) {
         if (refresh()) valid(name)?.let { return it }
         val creds = host.credentials()
             ?: throw ProviderException(ErrorKind.NOT_LOGGED_IN, "VRT MAX: niet ingelogd")
+        // Niet bij elke call opnieuw inloggen als dat net mislukte: VRT blokkeert dan nog langer.
+        val blockedUntil = store.get(AUTO_LOGIN_BLOCKED_UNTIL)?.toLongOrNull() ?: 0
+        if (host.nowMillis() < blockedUntil) {
+            throw ProviderException(ErrorKind.NOT_LOGGED_IN, "VRT MAX: automatisch inloggen even gepauzeerd na een mislukte poging")
+        }
         when (val r = login(creds)) {
             is LoginResult.Success -> return valid(name)
                 ?: throw ProviderException(ErrorKind.API_CHANGED, "token $name ontbreekt na login")
@@ -250,6 +268,8 @@ internal class VrtAuth(private val host: HostServices) {
         const val PLAYERTOKEN_URL = "https://media-services-public.vrt.be/vualto-video-aggregator-web/rest/external/v2/tokens"
         const val PLAYER_LIB = "https://player.vrt.be/vrtmax/js/player-lib.js"
 
+        private const val AUTO_LOGIN_BLOCKED_UNTIL = "autologin.blockedUntil"
+        private const val AUTO_LOGIN_COOLDOWN_MS = 15 * 60_000L
         const val AT = "vrtnu-site_profile_at"
         const val RT = "vrtnu-site_profile_rt"
         const val VT = "vrtnu-site_profile_vt"

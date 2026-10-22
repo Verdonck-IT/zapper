@@ -77,7 +77,9 @@ class MaintenanceWorker(context: Context, params: WorkerParameters) : CoroutineW
                 .setConstraints(constraints)
                 .setInputData(workDataOf(KEY_ONLY_IF_STALE to onlyIfStale))
                 .build()
-            WorkManager.getInstance(context).enqueueUniqueWork("maintenance-now", ExistingWorkPolicy.REPLACE, request)
+            // Achter een lopende sync aanschuiven, niet onderbreken: een sync schrijft pas op het einde
+            // per zender weg (een tweede login of "Catalogus nu syncen" brak zo de Play-sync af).
+            WorkManager.getInstance(context).enqueueUniqueWork("maintenance-now", ExistingWorkPolicy.APPEND_OR_REPLACE, request)
         }
     }
 }

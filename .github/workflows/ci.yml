@@ -13,5 +13,24 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 17 }
       - uses: gradle/actions/setup-gradle@v4
+      # Dubbele sleutels in JSON-assets worden stil overschreven (zo verdween ooit de hele Play-mapping).
+      - name: JSON-assets controleren
+        run: |
+          python3 - <<'PY'
+          import json, glob, sys
+          def no_dupes(pairs):
+              keys = [k for k, _ in pairs]
+              dupes = sorted({k for k in keys if keys.count(k) > 1})
+              if dupes:
+                  raise ValueError(f"dubbele sleutels: {dupes}")
+              return dict(pairs)
+          bad = 0
+          for f in glob.glob("app/src/main/assets/*.json"):
+              try:
+                  json.load(open(f, encoding="utf-8"), object_pairs_hook=no_dupes)
+              except Exception as e:
+                  print(f"::error file={f}::{e}"); bad += 1
+          sys.exit(1 if bad else 0)
+          PY
       # Unit tests (contracttests worden zonder credentials automatisch overgeslagen)
       - run: ./gradlew test :app:assembleDebug --stacktrace
