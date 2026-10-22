@@ -71,6 +71,12 @@ Volgende stappen (in deze volgorde):
 3. TMDB-verrijking (enkel aanvullen: ontbrekende beelden, jaar, omschrijving; koppelen op titel+jaar+type, gecachet per dedupKey; bij twijfel niet koppelen). Gebruiker moet nog een TMDB API-sleutel aanmaken. Geen AI voor categorieën (bewuste keuze).
 4. Plugin VTM GO; programma's op aanvraag voor Focus & WTV (stappen in README). Play: live contracttest met `PLAY_USERNAME/PASSWORD`.
 
+## Distributie
+- Repo is publiek: https://github.com/Verdonck-IT/zapper. Dist-site via GitHub Pages (branch `gh-pages`):
+  https://verdonck-it.github.io/zapper/ (standaard `zapperUpdateBaseUrl`).
+- Publiceren van plugins vraagt nog het secret `PLUGIN_SIGNING_KEY` (+ variabele `ZAPPER_PLUGIN_PUBLIC_KEY` voor de app);
+  zonder sleutel bouwt de workflow enkel. Nachtelijke check: variabele `HEALTH_RUNNER=true` + runner `zapper-be`.
+
 ## Testen
 - `./gradlew test` – unit tests; contracttests worden overgeslagen zonder credentials.
 - Live: `VRTMAX_USERNAME=… VRTMAX_PASSWORD=… ./gradlew :plugins:vrtmax:test`

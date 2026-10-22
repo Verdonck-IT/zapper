@@ -5,7 +5,7 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
-val updateBaseUrl = (findProperty("zapperUpdateBaseUrl") as String?) ?: "https://CHANGE-ME.github.io/zapper-dist/"
+val updateBaseUrl = (findProperty("zapperUpdateBaseUrl") as String?) ?: "https://verdonck-it.github.io/zapper/"
 
 android {
     namespace = "be.verdonckit.zapper"
