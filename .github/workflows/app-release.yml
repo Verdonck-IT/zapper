@@ -33,7 +33,7 @@ jobs:
           [ -n "$KEY_PASSWORD" ] || missing="$missing ZAPPER_KEY_PASSWORD"
           [ -n "$PLUGIN_PUBLIC_KEY" ] || missing="$missing ZAPPER_PLUGIN_PUBLIC_KEY"
           if [ -n "$missing" ]; then
-            echo "::error title=Secrets ontbreken::Zet deze repository-secrets:$missing (zie README, 'App-release')."
+            echo "::error title=Secrets ontbreken::Zet deze repository-secrets:$missing (zie README, stap 3 'App-signeersleutel')."
             exit 1
           fi
 
