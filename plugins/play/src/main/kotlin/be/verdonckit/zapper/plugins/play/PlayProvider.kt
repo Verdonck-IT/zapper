@@ -40,7 +40,7 @@ import java.text.Normalizer
  */
 class PlayProvider : StreamingProvider {
 
-    override val info = ProviderInfo(id = "play", displayName = "Play", brandColor = 0xFFEE3446, syncsProgress = true, supportsMyList = true)
+    override val info = ProviderInfo(id = "play", displayName = "Play", brandColor = 0xFFEE3446, syncsProgress = true, supportsMyList = true, supportsContinueRemoval = true)
 
     private lateinit var host: HostServices
     private lateinit var auth: PlayAuth
@@ -289,6 +289,12 @@ class PlayProvider : StreamingProvider {
                     ),
                 )
             }
+    }
+
+    /** Zelfde call als de Kodi-add-on ("delete_position"). */
+    override suspend fun removeFromContinueWatching(playableId: String) {
+        if (playableId.startsWith(LIVE_PREFIX)) return
+        api.delete("/web/v1/videos/continue-watching/$playableId")
     }
 
     // ---------- Mijn lijst ----------

@@ -4,7 +4,7 @@ package be.verdonckit.zapper.api
  * Versie van het plugin-contract. Verhoog dit bij elke breaking change in deze module.
  * De host laadt enkel plugins waarvan `apiVersion` in het manifest exact gelijk is.
  */
-const val PROVIDER_API_VERSION = 3
+const val PROVIDER_API_VERSION = 4
 
 /**
  * Eén streamingplatform (VRT MAX, VTM GO, ...).
@@ -71,6 +71,13 @@ interface StreamingProvider {
     /** Programma toevoegen aan of verwijderen uit "Mijn lijst" bij het platform. */
     suspend fun setInMyList(itemId: String, inList: Boolean): Unit =
         throw UnsupportedOperationException("${info.id} ondersteunt geen Mijn lijst")
+
+    /**
+     * Haalt een aflevering uit de "Verder kijken"-lijst van het platform.
+     * @param playableId zoals in [ContinueWatchingEntry.episode]
+     */
+    suspend fun removeFromContinueWatching(playableId: String): Unit =
+        throw UnsupportedOperationException("${info.id} kan niets uit Verder kijken verwijderen")
 
     suspend fun acquireLicense(stream: StreamInfo, challenge: ByteArray): ByteArray =
         throw UnsupportedOperationException("${info.id} handelt licenties niet zelf af")

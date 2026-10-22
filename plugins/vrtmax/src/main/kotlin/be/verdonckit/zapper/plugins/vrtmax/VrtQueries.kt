@@ -34,6 +34,7 @@ internal object VrtQueries {
           primaryMeta { type value shortValue longValue }
           progress { durationInSeconds progressInSeconds completed }
           preview { heading { ... on Banner { title } } }
+          actionItems { action { __typename ... on ListDeleteAction { id listName } } }
         }
     """
 
@@ -133,6 +134,13 @@ internal object VrtQueries {
             __typename
             actionItem { action { __typename ... on FavoriteAction { id favorite } } }
           }
+        }
+    """
+
+    /** "Verwijderen uit deze lijst", zoals de website en de Kodi-add-on. */
+    val LIST_DELETE = """
+        mutation listDelete(${'$'}input: ListDeleteActionInput!) {
+          setListDeleteActionItem(input: ${'$'}input) { __typename }
         }
     """
 

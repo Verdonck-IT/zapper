@@ -21,6 +21,7 @@ data class ProviderStatus(
     val version: String,
     val isDev: Boolean,
     val loggedIn: Boolean?,
+    val requiresLogin: Boolean = true,
     val username: String?,
     val health: String?,
 )
@@ -46,6 +47,7 @@ class SettingsViewModel(private val app: Application, private val graph: AppGrap
                 version = if (p.isDev) "dev" else p.version,
                 isDev = p.isDev,
                 loggedIn = runCatching { p.provider.isLoggedIn() }.getOrNull(),
+                requiresLogin = p.provider.info.requiresLogin,
                 username = graph.credentials.get(p.id)?.username,
                 health = graph.plugins.lastHealth(p.id)?.let(::summarize),
             )

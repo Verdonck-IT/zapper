@@ -103,12 +103,16 @@ fun ContentCard(
     width: Dp = 260.dp,
     badge: CardBadge? = null,
     progressColor: Color = ZapperColors.Accent,
+    onLongClick: (() -> Unit)? = null,
+    /** Titel onderaan over het beeld; uit als de naam al onder de kaart staat. */
+    showTitle: Boolean = true,
 ) {
     val hasCandidates = imageUrls.any { !it.isNullOrBlank() }
     var imageFailed by remember(imageUrls) { mutableStateOf(!hasCandidates) }
 
     Card(
         onClick = onClick,
+        onLongClick = onLongClick,
         modifier = modifier
             .then(if (width > 0.dp) Modifier.width(width) else Modifier.fillMaxWidth())
             .aspectRatio(16f / 9f)
@@ -150,7 +154,7 @@ fun ContentCard(
                     )
                 }
             }
-            if (!imageFailed) {
+            if (!imageFailed && showTitle) {
                 Box(
                     Modifier
                         .fillMaxWidth()

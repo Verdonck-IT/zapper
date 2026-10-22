@@ -9,6 +9,12 @@
     "  5. niets gevonden -> 'other' (Meer om te ontdekken)",
     "'popular' komt uit de eigen populair-lijst van elke zender; de volgorde in die lijst bepaalt de positie in de rij, zodat zenders om beurten verschijnen."
   ],
+  "liveOrder_doc": "Volgorde van de zenders op de pagina Live tv: populairste eerst, naar CIM-marktaandeel (Vlaanderen). Op titel; onbekende zenders komen achteraan.",
+  "liveOrder": [
+    "VRT 1", "Play", "VRT Canvas", "Play Fictie", "Ketnet", "Play Crime", "Play Reality", "Play Actie",
+    "VRT NWS", "Sporza", "Focus", "WTV", "Nostalgie"
+  ],
+
   "categories": [
     { "id": "popular",   "name": "Moet je nu zien" },
     { "id": "live",      "name": "Live tv" },

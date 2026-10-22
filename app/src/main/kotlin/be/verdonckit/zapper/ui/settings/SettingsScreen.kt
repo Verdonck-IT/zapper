@@ -147,17 +147,20 @@ private fun ProviderCard(
             Text(status.name, style = MaterialTheme.typography.headlineSmall, color = Color.White)
             Text("plugin ${status.version}", style = MaterialTheme.typography.bodyMedium, color = ZapperColors.TextSecondary)
         }
-        val loginText = when (status.loggedIn) {
-            true -> "Ingelogd${status.username?.let { " als $it" } ?: ""}"
-            false -> "Niet ingelogd"
-            null -> "Status onbekend"
+        val loginText = when {
+            !status.requiresLogin -> "Geen login nodig"
+            status.loggedIn == true -> "Ingelogd${status.username?.let { " als $it" } ?: ""}"
+            status.loggedIn == false -> "Niet ingelogd"
+            else -> "Status onbekend"
         }
         Text(loginText, color = if (status.loggedIn == true) ZapperColors.Success else ZapperColors.TextSecondary)
         status.health?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = ZapperColors.TextSecondary) }
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(onClick = onLoginClick, enabled = !busy) { Text(if (status.loggedIn == true) "Opnieuw inloggen" else "Inloggen") }
-            if (status.loggedIn == true) OutlinedButton(onClick = onLogout, enabled = !busy) { Text("Uitloggen") }
+            if (status.requiresLogin) {
+                Button(onClick = onLoginClick, enabled = !busy) { Text(if (status.loggedIn == true) "Opnieuw inloggen" else "Inloggen") }
+                if (status.loggedIn == true) OutlinedButton(onClick = onLogout, enabled = !busy) { Text("Uitloggen") }
+            }
             OutlinedButton(onClick = onTest, enabled = !busy) { Text("Test plugin") }
         }
 

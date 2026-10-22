@@ -62,6 +62,36 @@ class ProgressSync(private val dao: CatalogDao, private val plugins: PluginManag
         dao.replaceRemoteContinue(plugin.id, entries)
     }
 
+    /**
+     * Kan deze aflevering uit "Verder kijken"? Zonder eigen lijst bij het platform altijd (enkel lokaal);
+     * met eigen lijst enkel als het platform verwijderen ondersteunt, anders komt ze bij de volgende verversing terug.
+     */
+    fun canRemove(providerId: String): Boolean {
+        val info = plugins.get(providerId)?.provider?.info ?: return true
+        return !info.syncsProgress || info.supportsContinueRemoval
+    }
+
+    /** @return null bij succes, anders een foutmelding (de aflevering staat er dan terug). */
+    suspend fun remove(providerId: String, playableId: String): String? {
+        val key = "$providerId:$playableId"
+        val remote = dao.remoteContinueEntry(key)
+        val local = dao.progress(key)
+        dao.deleteRemoteContinueEntry(key)
+        dao.deleteProgress(key)
+        val plugin = plugins.get(providerId) ?: return null
+        val info = plugin.provider.info
+        if (!info.syncsProgress || !info.supportsContinueRemoval) return null
+        return try {
+            plugin.provider.removeFromContinueWatching(playableId)
+            null
+        } catch (e: Exception) {
+            Log.w(TAG, "$providerId: verwijderen uit Verder kijken mislukt: ${e.message}")
+            remote?.let { dao.insertRemoteContinue(listOf(it)) }
+            local?.let { dao.saveProgress(it) }
+            "Verwijderen bij ${plugin.name} mislukt: ${e.message}"
+        }
+    }
+
     private suspend fun titleIndex(providerId: String): Map<String, String> =
         dao.titlesFor(providerId).associate { CategoryMapper.normalize(it.title) to it.key }
 

@@ -45,7 +45,8 @@ android {
             buildConfigField(
                 "String",
                 "DEV_PLUGINS",
-                "\"be.verdonckit.zapper.plugins.vrtmax.VrtMaxProvider,be.verdonckit.zapper.plugins.play.PlayProvider\"",
+                "\"be.verdonckit.zapper.plugins.vrtmax.VrtMaxProvider,be.verdonckit.zapper.plugins.play.PlayProvider," +
+                    "be.verdonckit.zapper.plugins.focuswtv.FocusWtvProvider\"",
             )
         }
         release {
@@ -80,6 +81,7 @@ dependencies {
     implementation(project(":provider-api"))
     debugImplementation(project(":plugins:vrtmax"))
     debugImplementation(project(":plugins:play"))
+    debugImplementation(project(":plugins:focuswtv"))
 
     implementation(libs.kotlinx.coroutines.android)
 

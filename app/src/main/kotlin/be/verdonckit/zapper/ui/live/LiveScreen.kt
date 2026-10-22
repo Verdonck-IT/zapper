@@ -29,6 +29,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import be.verdonckit.zapper.graph
+import kotlinx.coroutines.flow.map
 import be.verdonckit.zapper.player.PlayerActivity
 import be.verdonckit.zapper.ui.components.BackToTop
 import be.verdonckit.zapper.ui.components.CardBadge
@@ -41,7 +42,10 @@ import be.verdonckit.zapper.ui.theme.ZapperColors
 fun LiveScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val graph = context.graph
-    val channels by remember { graph.dao.liveChannels() }.collectAsStateWithLifecycle(emptyList())
+    // Populairste zenders eerst (volgorde in categories.json), ongeacht de provider.
+    val channels by remember {
+        graph.dao.liveChannels().map { list -> list.sortedBy { graph.categoryMapper.liveRank(it.title) } }
+    }.collectAsStateWithLifecycle(emptyList())
     val plugins by graph.plugins.plugins.collectAsStateWithLifecycle()
     val grid = rememberLazyGridState()
     val firstCard = remember { FocusRequester() }
@@ -79,8 +83,8 @@ fun LiveScreen(onBack: () -> Unit) {
                 Column {
                     ContentCard(
                         title = ch.title,
-                        // Geen beeld: het logo staat groot op de merkkleur van de provider.
-                        imageUrls = emptyList(),
+                        // Eigen zenderkaart als de plugin die levert (bv. Focus, WTV); anders het logo op de merkkleur.
+                        imageUrls = listOf(ch.backdropUrl),
                         brandColor = brand,
                         logoUrl = ch.logoUrl,
                         providerLabel = null,
@@ -93,6 +97,7 @@ fun LiveScreen(onBack: () -> Unit) {
                         },
                         onFocus = {},
                         width = 0.dp,
+                        showTitle = false,
                         modifier = if (index == 0) {
                             Modifier.focusRequester(firstCard).onFocusChanged { firstFocused = it.isFocused }
                         } else {

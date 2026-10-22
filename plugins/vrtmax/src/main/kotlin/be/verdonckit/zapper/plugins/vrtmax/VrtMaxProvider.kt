@@ -25,7 +25,7 @@ import java.util.Base64
 
 class VrtMaxProvider : StreamingProvider {
 
-    override val info = ProviderInfo(id = "vrtmax", displayName = "VRT MAX", brandColor = 0xFF00D1A7, syncsProgress = true, supportsMyList = true)
+    override val info = ProviderInfo(id = "vrtmax", displayName = "VRT MAX", brandColor = 0xFF00D1A7, syncsProgress = true, supportsMyList = true, supportsContinueRemoval = true)
 
     private lateinit var host: HostServices
     private lateinit var auth: VrtAuth
@@ -227,6 +227,7 @@ class VrtMaxProvider : StreamingProvider {
     /** De lijst "Programma's verder kijken" van VRT MAX (zelfde lijst als op de website). */
     override suspend fun continueWatching(): List<ContinueWatchingEntry> {
         val out = mutableListOf<ContinueWatchingEntry>()
+        val deleteActions = JSONObject()
         var cursor: String? = null
         var pages = 0
         do {
@@ -237,6 +238,9 @@ class VrtMaxProvider : StreamingProvider {
             for (node in conn.arr("edges").objects().mapNotNull { it.obj("node") }) {
                 if (node.str("__typename") != "EpisodeTile") continue
                 val ep = episodeTile(node) ?: continue
+                node.arr("actionItems").objects().mapNotNull { it.obj("action") }
+                    .firstOrNull { it.str("__typename") == "ListDeleteAction" }
+                    ?.let { a -> deleteActions.put(ep.playableId, JSONObject().put("id", a.str("id")).put("listName", a.str("listName"))) }
                 if (ep.progress?.completed == true) continue
                 out += ContinueWatchingEntry(
                     itemId = programNameFromLink(ep.playableId),
@@ -249,7 +253,18 @@ class VrtMaxProvider : StreamingProvider {
             cursor = nextCursor(conn)
             pages++
         } while (cursor != null && pages < 2)
+        host.storage.put(CONTINUE_DELETE_KEY, deleteActions.toString())
         return out
+    }
+
+    /** "Verwijderen uit deze lijst" op de tegel in "Programma's verder kijken". */
+    override suspend fun removeFromContinueWatching(playableId: String) {
+        fun lookup() = host.storage.get(CONTINUE_DELETE_KEY)?.let { runCatching { JSONObject(it).optJSONObject(playableId) }.getOrNull() }
+        val action = lookup() ?: run { continueWatching(); lookup() }
+            ?: throw ProviderException(ErrorKind.NOT_AVAILABLE, "aflevering staat niet (meer) in Verder kijken")
+        val id = action.str("id") ?: throw ProviderException(ErrorKind.API_CHANGED, "ListDeleteAction zonder id")
+        val listName = action.str("listName") ?: throw ProviderException(ErrorKind.API_CHANGED, "ListDeleteAction zonder listName")
+        api.graphql("listDelete", VrtQueries.LIST_DELETE, "{\"input\":{\"id\":${jsonString(id)},\"listName\":${jsonString(listName)}}}")
     }
 
     /** Zelfde endpoint en marges als de Kodi-add-on: < 30 s = niet begonnen, laatste 30 s = uitgekeken. */
@@ -386,6 +401,7 @@ class VrtMaxProvider : StreamingProvider {
         private val SEASON_EPISODE_IN_LINK = Regex("""-s(\d+)a(\d+)/?$""")
         private const val RESUME_POINTS_URL = "https://ddt.profiel.vrt.be/resumePoints"
         private const val EXTRA_MEDIA_ID = "resumeMediaId"
+        private const val CONTINUE_DELETE_KEY = "continue.deleteActions"
         private const val EXTRA_MEDIA_NAME = "resumeMediaName"
 
         /** "Mijn lijst": favoriete programma's (zelfde id als de Kodi-add-on). */

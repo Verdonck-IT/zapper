@@ -39,6 +39,8 @@ data class Tile(
     val progress: Float? = null,
     val item: ItemEntity? = null,
     val play: PlayTarget? = null,
+    /** Kan uit "Verder kijken" verwijderd worden (OK ingedrukt houden). */
+    val removable: Boolean = false,
 )
 
 data class HomeRow(val id: String, val title: String, val tiles: List<Tile>)
@@ -116,6 +118,7 @@ class HomeViewModel(private val graph: AppGraph) : ViewModel() {
                 progress = if (dur > 0 && pos > 0) pos.toFloat() / dur else null,
                 item = item,
                 play = PlayTarget(r.providerId, r.playableId, be.verdonckit.zapper.ui.detail.playTitle(r.itemTitle, r.episodeTitle), r.itemKey, r.imageUrl ?: item?.backdropUrl),
+                removable = graph.progressSync.canRemove(r.providerId),
             )
         }
 
@@ -136,6 +139,7 @@ class HomeViewModel(private val graph: AppGraph) : ViewModel() {
                 progress = if (p.durationMs > 0) p.positionMs.toFloat() / p.durationMs else null,
                 item = item,
                 play = PlayTarget(p.providerId, p.playableId, p.title, p.itemKey, p.imageUrl),
+                removable = graph.progressSync.canRemove(p.providerId),
             )
         }
         return candidates
@@ -157,6 +161,16 @@ class HomeViewModel(private val graph: AppGraph) : ViewModel() {
             loading = false,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeState())
+
+    private val _message = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+    val message: StateFlow<String?> = _message
+
+    fun removeFromContinue(tile: Tile) {
+        val play = tile.play ?: return
+        viewModelScope.launch { _message.value = graph.progressSync.remove(play.providerId, play.playableId) }
+    }
+
+    fun clearMessage() { _message.value = null }
 
     /** Bij terugkeer naar het startscherm: "Verder kijken" opnieuw bij de platformen ophalen. */
     fun refreshContinue(force: Boolean = false) {

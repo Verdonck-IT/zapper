@@ -19,6 +19,8 @@ jobs:
             env: VRTMAX
           - plugin: play
             env: PLAY
+          - plugin: focuswtv
+            env: FOCUSWTV # geen login nodig; secrets mogen leeg blijven
           # Nieuwe provider? Voeg hier een regel toe + de secrets <ENV>_USERNAME/_PASSWORD.
     steps:
       - uses: actions/checkout@v4

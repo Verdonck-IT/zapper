@@ -244,6 +244,15 @@ interface CatalogDao {
     @Query("SELECT * FROM remote_continue WHERE itemKey = :itemKey ORDER BY sortOrder")
     suspend fun remoteContinueForItem(itemKey: String): List<RemoteContinueEntity>
 
+    @Query("SELECT * FROM remote_continue WHERE playableKey = :playableKey")
+    suspend fun remoteContinueEntry(playableKey: String): RemoteContinueEntity?
+
+    @Query("DELETE FROM remote_continue WHERE playableKey = :playableKey")
+    suspend fun deleteRemoteContinueEntry(playableKey: String)
+
+    @Query("DELETE FROM progress WHERE playableKey = :playableKey")
+    suspend fun deleteProgress(playableKey: String)
+
     @Query("DELETE FROM remote_continue WHERE providerId = :providerId")
     suspend fun deleteRemoteContinue(providerId: String)
 

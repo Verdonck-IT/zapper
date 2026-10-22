@@ -1,5 +1,6 @@
 package be.verdonckit.zapper.ui.home
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -69,6 +71,8 @@ fun HomeScreen(onOpen: (ItemEntity) -> Unit, onNavigate: (SidebarDestination) ->
     val firstRowState = rememberLazyListState()
     var firstCardFocused by remember { mutableStateOf(false) }
     var sidebarOpen by remember { mutableStateOf(false) }
+    var menuFor by remember { mutableStateOf<Tile?>(null) }
+    val message by vm.message.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
     val scope = rememberCoroutineScope()
 
@@ -157,12 +161,17 @@ fun HomeScreen(onOpen: (ItemEntity) -> Unit, onNavigate: (SidebarDestination) ->
                 itemsIndexed(state.rows, key = { _, row -> row.id }) { rowIndex, row ->
                     val ownRowState = rememberLazyListState()
                     Column {
-                        Text(
-                            row.title,
-                            style = MaterialTheme.typography.headlineSmall,
-                            color = MaterialTheme.colorScheme.onBackground,
-                            modifier = Modifier.padding(start = 56.dp, bottom = 10.dp),
-                        )
+                        Row(Modifier.padding(start = 56.dp, bottom = 10.dp), verticalAlignment = Alignment.Bottom) {
+                            Text(row.title, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onBackground)
+                            if (row.id == "continue" && row.tiles.any { it.removable }) {
+                                Text(
+                                    "   houd OK ingedrukt om te verwijderen",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = ZapperColors.TextSecondary,
+                                    modifier = Modifier.padding(bottom = 3.dp),
+                                )
+                            }
+                        }
                         DefaultScrollInside(defaultScroll) {
                         LazyRow(
                             state = if (rowIndex == 0) firstRowState else ownRowState,
@@ -182,6 +191,7 @@ fun HomeScreen(onOpen: (ItemEntity) -> Unit, onNavigate: (SidebarDestination) ->
                                     progress = tile.progress,
                                     onClick = { activate(tile) },
                                     onFocus = { focused = tile; lastFocusedCard = cardKey },
+                                    onLongClick = if (row.id == "continue" && tile.removable) ({ menuFor = tile }) else null,
                                     modifier = Modifier
                                         .focusRequester(requester)
                                         .then(if (isFirst) Modifier.onFocusChanged { firstCardFocused = it.isFocused } else Modifier),
@@ -194,6 +204,37 @@ fun HomeScreen(onOpen: (ItemEntity) -> Unit, onNavigate: (SidebarDestination) ->
                 }
             }
             }
+        }
+
+        message?.let { msg ->
+            Text(
+                msg,
+                style = MaterialTheme.typography.bodyLarge,
+                color = Color.White,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 32.dp)
+                    .background(Color(0xE6202020), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+            )
+            LaunchedEffect(msg) {
+                kotlinx.coroutines.delay(5_000)
+                vm.clearMessage()
+            }
+        }
+
+        menuFor?.let { tile ->
+            ContinueMenu(
+                tile = tile,
+                onOpenProgram = tile.item?.let { item -> { menuFor = null; onOpen(item) } },
+                onRemove = {
+                    menuFor = null
+                    vm.removeFromContinue(tile)
+                    // Focus terug naar het begin van de rij; de kaart zelf verdwijnt.
+                    scope.launch { firstCard.requestFocusAfterLayout() }
+                },
+                onDismiss = { menuFor = null },
+            )
         }
 
         Sidebar(

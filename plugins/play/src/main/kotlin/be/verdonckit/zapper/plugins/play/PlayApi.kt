@@ -22,6 +22,11 @@ internal class PlayApi(private val host: HostServices, private val auth: PlayAut
         check(path, resp)
     }
 
+    suspend fun delete(path: String) {
+        val resp = request(path, "DELETE", null, authenticated = true)
+        check(path, resp)
+    }
+
     private suspend fun request(path: String, method: String, json: JSONObject?, authenticated: Boolean): HttpResponse {
         repeat(2) { attempt ->
             val headers = buildMap {

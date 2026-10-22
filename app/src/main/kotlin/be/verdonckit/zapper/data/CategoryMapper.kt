@@ -21,6 +21,8 @@ class CategoryMapper(json: String) {
     private data class Rule(val whenAll: Set<String>, val add: Set<String>, val remove: Set<String>, val keepOnly: Set<String>?)
 
     val categories: List<UnifiedCategory>
+    /** Genormaliseerde zendernamen, populairste eerst (zie "liveOrder" in categories.json). */
+    private val liveOrder: List<String>
     private val titles: Map<String, List<String>>
     private val providerMaps: Map<String, Map<String, List<String>>>
     private val keywords: Map<String, List<Regex>>
@@ -29,6 +31,7 @@ class CategoryMapper(json: String) {
     init {
         val root = JSONObject(json)
         categories = root.getJSONArray("categories").objects().map { UnifiedCategory(it.getString("id"), it.getString("name")) }
+        liveOrder = root.optJSONArray("liveOrder")?.strings()?.map(::normalize).orEmpty()
         titles = root.optJSONObject("titles")?.let { t ->
             t.keys().asSequence().associate { normalize(it) to t.getJSONArray(it).strings() }
         }.orEmpty()
@@ -52,6 +55,9 @@ class CategoryMapper(json: String) {
             )
         }.orEmpty()
     }
+
+    /** Positie van een live-zender in de populariteitsvolgorde; onbekende zenders achteraan. */
+    fun liveRank(title: String): Int = liveOrder.indexOf(normalize(title)).let { if (it < 0) Int.MAX_VALUE else it }
 
     /** Welke native categorieën van deze zender leveren de eigen categorie [unified] aan? */
     fun nativeSources(providerId: String, unified: String): List<String> =
