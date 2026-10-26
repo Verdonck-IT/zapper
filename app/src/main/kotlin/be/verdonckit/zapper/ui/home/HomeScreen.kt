@@ -28,8 +28,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
@@ -51,6 +49,8 @@ import be.verdonckit.zapper.data.ItemEntity
 import be.verdonckit.zapper.graph
 import be.verdonckit.zapper.player.PlayerActivity
 import be.verdonckit.zapper.ui.components.BackToTop
+import be.verdonckit.zapper.ui.components.TrackedFocusRequester
+import be.verdonckit.zapper.ui.components.focusRequester
 import be.verdonckit.zapper.ui.components.ContentCard
 import be.verdonckit.zapper.ui.components.DefaultScrollInside
 import be.verdonckit.zapper.ui.components.PivotToTop
@@ -69,7 +69,7 @@ fun HomeScreen(onOpen: (ItemEntity) -> Unit, onNavigate: (SidebarDestination) ->
     val vm: HomeViewModel = viewModel { HomeViewModel(context.graph) }
     val state by vm.state.collectAsStateWithLifecycle()
     var focused by remember { mutableStateOf<Tile?>(null) }
-    val firstCard = remember { FocusRequester() }
+    val firstCard = remember { TrackedFocusRequester() }
     val listState = rememberLazyListState()
     val firstRowState = rememberLazyListState()
     var firstCardFocused by remember { mutableStateOf(false) }
@@ -83,13 +83,13 @@ fun HomeScreen(onOpen: (ItemEntity) -> Unit, onNavigate: (SidebarDestination) ->
     // Per kaart een FocusRequester, zodat de focus na het sluiten van het menu terugkeert waar je was.
     // De eerste kaart bovenaan heeft [firstCard] en staat hier bewust niet in: "Verder kijken" kan
     // herschikken, en dan zou een andere kaart via deze map ook firstCard krijgen.
-    val cardFocus = remember { HashMap<String, FocusRequester>() }
-    var lastFocusedCard by remember { mutableStateOf<FocusRequester?>(null) }
+    val cardFocus = remember { HashMap<String, TrackedFocusRequester>() }
+    var lastFocusedCard by remember { mutableStateOf<TrackedFocusRequester?>(null) }
 
     fun closeSidebar() {
         sidebarOpen = false
         scope.launch {
-            val target = lastFocusedCard ?: firstCard
+            val target = (lastFocusedCard?.takeIf { it.isAttached } ?: firstCard).requester
             target.requestFocusAfterLayout()
         }
     }
@@ -100,7 +100,7 @@ fun HomeScreen(onOpen: (ItemEntity) -> Unit, onNavigate: (SidebarDestination) ->
         toTop = {
             listState.scrollToItem(0)
             firstRowState.scrollToItem(0)
-            firstCard.requestFocusAfterLayout { firstCardFocused }
+            firstCard.requester.requestFocusAfterLayout { firstCardFocused }
         },
         onBackAtTop = { sidebarOpen = true },
     )
@@ -193,18 +193,19 @@ fun HomeScreen(onOpen: (ItemEntity) -> Unit, onNavigate: (SidebarDestination) ->
                         // ▲/▼ naar deze rij: terug naar de kaart waar je in deze rij stond, de eerste keer
                         // naar de eerste kaart (niet de kaart die toevallig het dichtst bij staat).
                         val rowFirst = if (rowIndex == 0) firstCard
-                        else cardFocus.getOrPut("${row.id}/${row.tiles.first().id}") { FocusRequester() }
+                        else cardFocus.getOrPut("${row.id}/${row.tiles.first().id}") { TrackedFocusRequester() }
                         DefaultScrollInside(defaultScroll) {
                         LazyRow(
                             state = if (rowIndex == 0) firstRowState else ownRowState,
                             contentPadding = PaddingValues(horizontal = 56.dp, vertical = 8.dp),
                             horizontalArrangement = Arrangement.spacedBy(14.dp),
-                            modifier = Modifier.focusRestorer { rowFirst },
+                            // Fallback enkel als die kaart er echt is (weggescrold of net vervangen = crash).
+                            modifier = Modifier.focusRestorer { rowFirst.orDefault() },
                         ) {
                             items(row.tiles, key = { it.id }) { tile ->
                                 val isFirst = rowIndex == 0 && tile == row.tiles.first()
                                 val cardKey = "${row.id}/${tile.id}"
-                                val requester = if (isFirst) firstCard else cardFocus.getOrPut(cardKey) { FocusRequester() }
+                                val requester = if (isFirst) firstCard else cardFocus.getOrPut(cardKey) { TrackedFocusRequester() }
                                 ContentCard(
                                     title = tile.title,
                                     imageUrls = tile.imageUrls,
@@ -253,7 +254,7 @@ fun HomeScreen(onOpen: (ItemEntity) -> Unit, onNavigate: (SidebarDestination) ->
                     menuFor = null
                     vm.removeFromContinue(tile)
                     // Focus terug naar het begin van de rij; de kaart zelf verdwijnt.
-                    scope.launch { firstCard.requestFocusAfterLayout() }
+                    scope.launch { firstCard.requester.requestFocusAfterLayout() }
                 },
                 onDismiss = { menuFor = null },
             )
@@ -275,7 +276,7 @@ fun HomeScreen(onOpen: (ItemEntity) -> Unit, onNavigate: (SidebarDestination) ->
     }
 
     LaunchedEffect(state.rows.isNotEmpty()) {
-        if (state.rows.isNotEmpty()) runCatching { firstCard.requestFocus() }
+        if (state.rows.isNotEmpty()) runCatching { firstCard.requester.requestFocus() }
     }
 }
 
