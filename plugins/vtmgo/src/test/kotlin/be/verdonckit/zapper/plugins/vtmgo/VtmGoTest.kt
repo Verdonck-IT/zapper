@@ -68,6 +68,20 @@ class VtmGoUnitTest {
     }
 
     @Test
+    fun `betalend aanbod herkennen`() {
+        assertEquals(true, VtmGoProvider.isPremium(JSONObject("""{"premiumProductLogo":{"name":"Streamz Basic"}}""")))
+        assertEquals(false, VtmGoProvider.isPremium(JSONObject("""{"premiumProductLogo":null}""")))
+        assertEquals(false, VtmGoProvider.isPremium(JSONObject("""{"title":"Got Talent"}""")))
+    }
+
+    @Test
+    fun `seizoen en aflevering uit Kijk verder`() {
+        assertEquals(2 to 35, VtmGoProvider.seasonAndEpisode("S2 A35"))
+        assertNull(VtmGoProvider.seasonAndEpisode("Aflevering 5"))
+        assertNull(VtmGoProvider.seasonAndEpisode(null))
+    }
+
+    @Test
     fun `vervaldatum uit JWT`() {
         val payload = Base64.getUrlEncoder().withoutPadding().encodeToString("""{"exp":1800000000}""".toByteArray())
         assertEquals(1_800_000_000_000L, VtmGoAuth.jwtExpiry("x.$payload.y"))

@@ -1,6 +1,7 @@
 package be.verdonckit.zapper.plugins.vtmgo
 
 import be.verdonckit.zapper.api.CatalogItem
+import be.verdonckit.zapper.api.ContinueWatchingEntry
 import be.verdonckit.zapper.api.Credentials
 import be.verdonckit.zapper.api.DeviceLogin
 import be.verdonckit.zapper.api.DrmInfo
@@ -40,6 +41,10 @@ import java.util.Base64
  *   (main, series, films, docu, kids). Elke storefront is een native categorie; de rijtitel geeft
  *   extra thema's ("Komische series" → `thema-comedy`) voor de mapping in categories.json.
  * - Streams: DASH met Widevine via DRMtoday; het licentieantwoord is JSON, dus [acquireLicense].
+ * - Enkel gratis VTM GO: alles van VTM GO+, Streamz en Cinema (`premiumProductLogo`, afleveringen
+ *   met een UPSELL-badge) wordt weggelaten, ook seizoenen zonder gratis afleveringen.
+ * - Kijk verder: rij CONTINUE_WATCHING van de homepage; voortgang via /userData/playerPosition
+ *   (zoals de website: PUT {position, duration}, DELETE = uit "Kijk verder").
  */
 class VtmGoProvider : StreamingProvider {
 
@@ -47,7 +52,9 @@ class VtmGoProvider : StreamingProvider {
         id = "vtmgo",
         displayName = "VTM GO",
         brandColor = 0xFFE4003A,
+        syncsProgress = true,
         supportsMyList = true,
+        supportsContinueRemoval = true,
         loginMethod = LoginMethod.DEVICE_CODE,
     )
 
@@ -131,6 +138,7 @@ class VtmGoProvider : StreamingProvider {
         val id = t.str("detailId") ?: t.path("target")?.str("id") ?: return null
         val title = t.str("title") ?: return null
         if (t.opt("comingSoon").let { it != null && it != JSONObject.NULL }) return null
+        if (isPremium(t)) return null
         val labels = t.arr("labels").objects().mapNotNull { it.str("label") }
         val image = t.str("imageUrl")
         return CatalogItem(
@@ -167,6 +175,7 @@ class VtmGoProvider : StreamingProvider {
 
     override suspend fun details(itemId: String): ItemDetails {
         val d = api.get("/detail3/$itemId")
+        if (isPremium(d)) throw ProviderException(ErrorKind.NOT_AVAILABLE, "VTM GO: enkel met een betalend abonnement")
         val headerLabels = d.arr("headerLabels").objects()
         val genres = headerLabels.filter { it.str("accessibilityLabel") == "Genre" }.mapNotNull { it.str("label") }
         val picker = d.obj("seasonPicker")
@@ -185,7 +194,9 @@ class VtmGoProvider : StreamingProvider {
         if (picker == null) {
             // Film of losse uitzending: één "seizoen" met de video zelf.
             val playable = d.obj("primaryButton")?.str("playableId")
-                ?: throw ProviderException(ErrorKind.NOT_AVAILABLE, "VTM GO: '$title' is niet afspeelbaar (${upsell(d) ?: "geen video"})")
+            if (playable == null || upsell(d) != null) {
+                throw ProviderException(ErrorKind.NOT_AVAILABLE, "VTM GO: '$title' is niet afspeelbaar (${upsell(d) ?: "geen video"})")
+            }
             val episode = Episode(
                 id = playable,
                 title = title,
@@ -193,35 +204,57 @@ class VtmGoProvider : StreamingProvider {
                 description = d.str("description"),
                 imageUrl = d.str("landscapeTeaserImageUrl"),
                 durationSeconds = d.optInt("durationSeconds", 0).takeIf { it > 0 },
-                available = upsell(d) == null,
             )
             return ItemDetails(item, listOf(Season("$itemId$SEASON_SEP$SINGLE", title, listOf(episode))))
         }
 
+        // Elk seizoen ophalen: seizoenen met enkel VTM GO+-afleveringen vallen weg (vaak de oudere).
         val selected = picker.obj("selected")
         val selectedIndex = selected?.optInt("index", -1) ?: -1
         val indices = picker.arr("indices").let { a -> (0 until a.length()).map { a.optInt(it) } }.ifEmpty { listOf(selectedIndex) }
-        val seasons = indices.map { index ->
-            Season(
-                id = "$itemId$SEASON_SEP$index",
-                title = "Seizoen $index",
-                episodesPreview = if (index == selectedIndex) episodesOf(selected, index) else emptyList(),
-            )
+        if (selected != null) cacheSeason(itemId, selectedIndex, episodesOf(selected, selectedIndex))
+        val gate = Semaphore(ROW_PARALLELISM)
+        val seasons = coroutineScope {
+            indices.map { index ->
+                async {
+                    // Ophalen mislukt = onbekend: seizoen tonen, de app vraagt de afleveringen later opnieuw.
+                    val eps = gate.withPermit { runCatching { seasonEpisodes(itemId, index) }.getOrNull() }
+                    Season(id = "$itemId$SEASON_SEP$index", title = "Seizoen $index", episodesPreview = eps.orEmpty())
+                        .takeIf { eps == null || eps.isNotEmpty() }
+                }
+            }.awaitAll().filterNotNull()
         }
+        if (seasons.isEmpty()) throw ProviderException(ErrorKind.NOT_AVAILABLE, "VTM GO: '$title' enkel met een betalend abonnement")
         return ItemDetails(item, seasons)
     }
 
     override suspend fun episodes(seasonId: String, cursor: String?): Page<Episode> {
         val (itemId, index) = seasonId.split(SEASON_SEP, limit = 2).let { it[0] to it.getOrElse(1) { "" } }
         if (index == SINGLE) return Page(details(itemId).seasons.first().episodesPreview, null)
-        val selected = api.get("/detail3/$itemId?selectedSeasonIndex=$index").path("seasonPicker", "selected")
-            ?: throw ProviderException(ErrorKind.API_CHANGED, "VTM GO: geen seizoen $index voor $itemId")
-        return Page(episodesOf(selected, index.toIntOrNull()), null)
+        val number = index.toIntOrNull() ?: throw ProviderException(ErrorKind.API_CHANGED, "VTM GO: ongeldig seizoen $seasonId")
+        return Page(seasonEpisodes(itemId, number), null)
     }
 
+    /** Gratis afleveringen van één seizoen, kort gecachet: details() en de app vragen ze kort na elkaar. */
+    private suspend fun seasonEpisodes(itemId: String, index: Int): List<Episode> {
+        val key = "$itemId$SEASON_SEP$index"
+        seasonCache[key]?.takeIf { host.nowMillis() - it.first < SEASON_CACHE_MS }?.let { return it.second }
+        val selected = api.get("/detail3/$itemId?selectedSeasonIndex=$index").path("seasonPicker", "selected")
+            ?: throw ProviderException(ErrorKind.API_CHANGED, "VTM GO: geen seizoen $index voor $itemId")
+        return episodesOf(selected, index).also { cacheSeason(itemId, index, it) }
+    }
+
+    private val seasonCache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, List<Episode>>>()
+
+    private fun cacheSeason(itemId: String, index: Int, episodes: List<Episode>) {
+        seasonCache["$itemId$SEASON_SEP$index"] = host.nowMillis() to episodes
+    }
+
+    /** Afleveringen van een seizoen, zonder die van VTM GO+ (UPSELL-badge). */
     private fun episodesOf(season: JSONObject?, seasonNumber: Int?): List<Episode> =
         season?.arr("episodes")?.objects().orEmpty().mapNotNull { e ->
             val id = e.str("id") ?: return@mapNotNull null
+            if (e.obj("badge")?.str("icon") == UPSELL) return@mapNotNull null
             val raw = e.str("title") ?: "Aflevering"
             val numbered = NUMBERED_TITLE.find(raw)
             val duration = e.optInt("durationSeconds", 0).takeIf { it > 0 }
@@ -235,7 +268,6 @@ class VtmGoProvider : StreamingProvider {
                 durationSeconds = duration,
                 seasonNumber = seasonNumber,
                 episodeNumber = e.optInt("index", 0).takeIf { it > 0 } ?: numbered?.groupValues?.get(1)?.toIntOrNull(),
-                available = e.obj("badge")?.str("icon") != UPSELL,
                 progress = if (percent > 0 && duration != null) {
                     WatchProgress(duration * percent / 100, duration, completed = percent >= 95)
                 } else {
@@ -283,6 +315,7 @@ class VtmGoProvider : StreamingProvider {
                 s.str("url")?.let { Subtitle(it, s.str("language") ?: "nl") }
             },
             isLive = live || video.str("streamType") == "live",
+            resumePositionSeconds = if (live) null else tokens.optInt("playerPositionSeconds", 0).takeIf { it > RESUME_MARGIN },
             extra = buildMap {
                 licenseUrl?.let { put(EXTRA_LICENSE_URL, it) }
                 authToken?.let { put(EXTRA_DRM_TOKEN, it) }
@@ -304,10 +337,92 @@ class VtmGoProvider : StreamingProvider {
         return licenseFromResponse(resp.body)
     }
 
+    // ---------- Kijk verder ----------
+
+    /**
+     * De rij "Kijk Verder" van de homepage. De tegel heeft enkel een percentage; duur, titel en
+     * beeld van de aflevering komen uit het seizoen (gecachet). Afleveringen van VTM GO+ vallen weg.
+     */
+    override suspend fun continueWatching(): List<ContinueWatchingEntry> {
+        val row = api.get("/storefronts/$MAIN").arr("rows").objects().firstOrNull { it.str("rowType") == CONTINUE_ROW }
+            ?: return emptyList()
+        val teasers = if (row.optBoolean("hasDetail")) {
+            runCatching { api.get("/storefronts/$MAIN/detail/${row.str("id")}").obj("row") }
+                .getOrNull()?.arr("teasers")?.objects() ?: row.arr("teasers").objects()
+        } else {
+            row.arr("teasers").objects()
+        }
+        val gate = Semaphore(ROW_PARALLELISM)
+        return coroutineScope {
+            teasers.filterNot { isPremium(it) }.map { t ->
+                async { gate.withPermit { continueEntry(t) } }
+            }.awaitAll().filterNotNull()
+        }
+    }
+
+    private suspend fun continueEntry(t: JSONObject): ContinueWatchingEntry? {
+        val playableId = t.str("playableId") ?: return null
+        val itemId = t.str("detailId")
+        val itemTitle = t.str("title") ?: return null
+        val percent = t.optInt("userProgressPercentage", 0)
+        val (season, number) = seasonAndEpisode(t.obj("seasonLabel")?.str("label")) ?: (null to null)
+        val fromSeason = if (itemId != null && season != null) {
+            val eps = runCatching { seasonEpisodes(itemId, season) }.getOrNull()
+            // Seizoen gekend maar aflevering niet bij de gratis afleveringen: VTM GO+, weglaten.
+            if (eps != null) eps.firstOrNull { it.playableId == playableId } ?: return null else null
+        } else {
+            null
+        }
+        val episode = fromSeason ?: Episode(
+            id = playableId,
+            title = t.obj("seasonLabel")?.str("accessibilityLabel") ?: itemTitle,
+            playableId = playableId,
+            description = t.str("description"),
+            imageUrl = t.str("imageUrl"),
+            seasonNumber = season,
+            episodeNumber = number,
+        )
+        val duration = episode.durationSeconds
+        val progress = episode.progress ?: if (percent > 0 && duration != null) {
+            WatchProgress(duration * percent / 100, duration, completed = percent >= 95)
+        } else {
+            null
+        }
+        return ContinueWatchingEntry(itemId = itemId, itemTitle = itemTitle, episode = episode.copy(progress = progress))
+    }
+
+    /** Zoals de website: PUT /userData/playerPosition/{id} met {position, duration} in seconden. */
+    override suspend fun reportProgress(stream: StreamInfo, playableId: String, positionSeconds: Int, durationSeconds: Int) {
+        if (stream.isLive || playableId.startsWith(LIVE_PREFIX)) return
+        api.put(
+            "/userData/playerPosition/$playableId",
+            JSONObject().put("position", positionSeconds).put("duration", durationSeconds),
+        )
+    }
+
+    /** DELETE van de spelerpositie haalt de aflevering uit "Kijk verder" (live getest 26/10/2026). */
+    override suspend fun removeFromContinueWatching(playableId: String) {
+        if (playableId.startsWith(LIVE_PREFIX)) return
+        api.delete("/userData/playerPosition/$playableId")
+        seasonCache.clear()
+    }
+
     // ---------- Mijn lijst ----------
 
-    override suspend fun myList(): List<CatalogItem> =
-        api.get("/my-list").arr("teasers").objects().mapNotNull { teaserItem(it, emptyList(), portrait = false, storefront = MAIN) }
+    /**
+     * De rij MY_LIST van de homepage: die tegels hebben `premiumProductLogo` (die van /my-list niet),
+     * zodat VTM GO+, Streamz en Cinema wegvallen. Zonder die rij (lege lijst?) /my-list als terugval.
+     */
+    override suspend fun myList(): List<CatalogItem> {
+        val row = api.get("/storefronts/$MAIN").arr("rows").objects().firstOrNull { it.str("rowType") == MY_LIST_ROW }
+        val teasers = when {
+            row == null -> api.get("/my-list").arr("teasers").objects()
+            row.optBoolean("hasDetail") -> runCatching { api.get("/storefronts/$MAIN/detail/${row.str("id")}").obj("row") }
+                .getOrNull()?.arr("teasers")?.objects() ?: row.arr("teasers").objects()
+            else -> row.arr("teasers").objects()
+        }
+        return teasers.mapNotNull { teaserItem(it, emptyList(), portrait = false, storefront = MAIN) }
+    }
 
     override suspend fun setInMyList(itemId: String, inList: Boolean) {
         if (inList) api.put("/userData/myList/$itemId") else api.delete("/userData/myList/$itemId")
@@ -321,6 +436,10 @@ class VtmGoProvider : StreamingProvider {
         private const val SEASON_SEP = "#"
         private const val SINGLE = "film"
         private const val UPSELL = "UPSELL"
+        private const val CONTINUE_ROW = "CONTINUE_WATCHING"
+        private const val MY_LIST_ROW = "MY_LIST"
+        private const val RESUME_MARGIN = 30
+        private const val SEASON_CACHE_MS = 2 * 60_000L
         private const val ROWS_PER_PAGE = 8
         private const val ROW_PARALLELISM = 4
         private const val EXTRA_LICENSE_URL = "licenseUrl"
@@ -338,10 +457,18 @@ class VtmGoProvider : StreamingProvider {
 
         private val POPULAR_ROW = Regex("moet je (nu )?zien|top ?10 op vtm go", RegexOption.IGNORE_CASE)
 
-        /** Rijen zonder video's die je hier kan kijken: podcasts, aankondigingen. */
-        private val SKIP_ROW = Regex("podcast|binnenkort", RegexOption.IGNORE_CASE)
+        /** Rijen zonder video's die je hier (gratis) kan kijken: podcasts, aankondigingen, betaalaanbod. */
+        private val SKIP_ROW = Regex("podcast|binnenkort|vtm go\\+|streamz|cinema|filmdeal", RegexOption.IGNORE_CASE)
 
         private val NUMBERED_TITLE = Regex("""^\s*(\d+)\.\s*(.*)$""")
+        private val SEASON_EPISODE = Regex("""S(\d+)\s*A(\d+)""", RegexOption.IGNORE_CASE)
+
+        /** Tegel of detail van VTM GO+, Streamz of Cinema (huren): heeft een `premiumProductLogo`. */
+        internal fun isPremium(o: JSONObject): Boolean = o.obj("premiumProductLogo") != null
+
+        /** "S1 A5" → (1, 5). */
+        internal fun seasonAndEpisode(label: String?): Pair<Int, Int>? =
+            label?.let { SEASON_EPISODE.find(it) }?.let { it.groupValues[1].toInt() to it.groupValues[2].toInt() }
         private val DURATION_LABEL = Regex("""^\s*(\d+\s*u|\d+\s*min)""", RegexOption.IGNORE_CASE)
 
         /**

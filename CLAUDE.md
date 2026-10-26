@@ -67,8 +67,11 @@ Klaar:
   (main/series/films/docu/kids) met `thema-*` uit rijtitels, details/seizoenen via `detail3`, live, Mijn lijst, streams via
   `play-config` + DRMtoday (`acquireLicense`). Live getest via de testkit (26/10/2026): login met code, refresh,
   alle storefronts (series 755, films 2685, docu 474, kids 1253), 10 live-zenders, Mijn lijst lezen, streams (DASH + Widevine)
-  en manifest. Oudere seizoenen zijn vaak VTM GO+ (UPSELL → niet beschikbaar). NIET getest: licentie/afspelen op toestel,
-  Mijn lijst schrijven. login.vtm.be stuurt altijd gzip (testkit pakt nu uit zoals OkHttp).
+  en manifest. login.vtm.be stuurt altijd gzip (testkit pakt nu uit zoals OkHttp).
+  Enkel gratis (wens gebruiker): VTM GO+, Streamz en Cinema (`premiumProductLogo`, UPSELL-afleveringen, lege seizoenen)
+  nooit tonen. Kijk verder (provider: syncsProgress + supportsContinueRemoval) uit de rij CONTINUE_WATCHING; voortgang
+  PUT/DELETE /userData/playerPosition/{id}, gevonden via vtmgo.be (web: /api/player/position) en live getest
+  (positie terug gelezen, verwijderen + herstellen). NIET getest: licentie/afspelen op toestel, Mijn lijst schrijven.
   Referentie: fork frankdpGH/plugin.video.vtm.go (API 28).
 - VRT-genres (26/10/2026): de oude zoeklijst-id's ("o%14|…|watch%") geven `list: null`; vrt.be/vrtmax/categorieen/ verwijst
   nu naar /zoeken/. Catalogus per genre/type via GraphQL `pageSearch(input: {facets, mediaType: video})` → tabblad met

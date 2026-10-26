@@ -55,8 +55,8 @@ laadt enkel plugins met exact dezelfde versie. Optionele mogelijkheden staan als
 | `requiresLogin` | `login()`, `isLoggedIn()` | ✓ | ✓ | – (geen login) |
 | `loginMethod = DEVICE_CODE` | `startDeviceLogin()`, `pollDeviceLogin()` | – | – | – (enkel VTM GO) |
 
-VTM GO staat niet in de tabel: `requiresLogin`, `supportsMyList` en `loginMethod = DEVICE_CODE`; geen
-platformvoortgang (`syncsProgress`) en niets verwijderen uit "Verder kijken".
+VTM GO staat niet in de tabel: `requiresLogin`, `syncsProgress`, `supportsMyList`, `supportsContinueRemoval`
+en `loginMethod = DEVICE_CODE`.
 
 DRM wordt nooit omzeild: plugins leveren een manifest en een Widevine-licentie-URL met headers,
 de app speelt af via de Widevine-CDM van het toestel.
@@ -73,7 +73,13 @@ de app speelt af via de Widevine-CDM van het toestel.
   refresh token (roteert bij elke vernieuwing). Catalogus: geen A–Z of genres meer, enkel thematische rijen per
   storefront (`main`, `series`, `films`, `docu`, `kids`); de plugin leidt `thema-*` af uit de rijtitel voor de
   mapping in categories.json. Details via `detail3` (seizoenen met `selectedSeasonIndex`), streams via
-  `play-config` (DASH, Widevine via DRMtoday met JSON-licentie, dus `acquireLicense`). De API weigert oude
+  `play-config` (DASH, Widevine via DRMtoday met JSON-licentie, dus `acquireLicense`).
+  Enkel gratis aanbod: tegels en details met `premiumProductLogo` (VTM GO+, Streamz, Cinema) en afleveringen met
+  een `UPSELL`-badge vallen weg; `details()` haalt daarom elk seizoen op (2 min gecachet) en laat lege seizoenen weg.
+  Mijn lijst komt uit de rij `MY_LIST` van de homepage (/my-list heeft geen `premiumProductLogo`).
+  Kijk verder: rij `CONTINUE_WATCHING` (enkel een percentage; duur en titel uit het seizoen), hervatten via
+  `playerPositionSeconds` van `/play/{id}`, voortgang `PUT /userData/playerPosition/{id}` met `{position, duration}`
+  en verwijderen `DELETE` op hetzelfde pad (zoals vtmgo.be, de Kodi-add-on doet dit niet). De API weigert oude
   app-versies (HTTP 426): `x-app-version`/User-Agent in `VtmGoAuth.API_HEADERS` bijwerken. Afgeleid van de fork
   [frankdpGH/plugin.video.vtm.go](https://github.com/frankdpGH/plugin.video.vtm.go) (het origineel staat stil).
 - **Focus & WTV** – enkel de twee livestreams, zonder login: de HLS-URL komt uit de embed-speler

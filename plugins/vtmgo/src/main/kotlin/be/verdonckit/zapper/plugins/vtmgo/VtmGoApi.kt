@@ -12,7 +12,8 @@ internal class VtmGoApi(private val host: HostServices, private val auth: VtmGoA
 
     suspend fun get(path: String): JSONObject = parse(path, request(path, "GET"))
 
-    suspend fun put(path: String) = check(path, request(path, "PUT", ByteArray(0)))
+    suspend fun put(path: String, body: JSONObject? = null) =
+        check(path, request(path, "PUT", body?.toString()?.toByteArray() ?: ByteArray(0)))
 
     suspend fun delete(path: String) = check(path, request(path, "DELETE"))
 

@@ -32,8 +32,9 @@ VRT MAX, VTM GO, Play en de live-zenders van Focus en WTV staan samen in één a
 | Play | programma's, films, live: Play, Play Fictie, Play Crime, Play Reality, Play Actie, Nostalgie | gratis Play-account |
 | Focus & WTV | live: Focus, WTV | geen login nodig |
 
-Play Kinepolis (huur- en koopfilms) zit er niet in. Bij VTM GO kan je enkel kijken wat je account toelaat:
-programma's van VTM GO+ of Streamz vragen een betalend abonnement.
+Play Kinepolis (huur- en koopfilms) zit er niet in. Van VTM GO toont Zapper enkel het gratis aanbod:
+programma's, seizoenen en afleveringen van VTM GO+, Streamz en VTM GO Cinema (huren) zie je niet.
+"Kijk verder" en je kijkpositie lopen gelijk met de VTM GO-app en vtmgo.be.
 
 ## In beeld
 
