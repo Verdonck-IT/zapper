@@ -15,10 +15,15 @@ import java.net.http.HttpRequest as JRequest
 import java.net.http.HttpResponse as JResponse
 import java.time.Duration
 
-/** Host voor plugins op een gewone JVM: voor contracttests en lokaal debuggen. */
+/**
+ * Host voor plugins op een gewone JVM: voor contracttests en lokaal debuggen.
+ * [storage] is standaard in het geheugen; contracttests geven een [FileKeyValueStore] mee
+ * zodat tokens tussen runs bewaard blijven (zie [TestkitFiles]).
+ */
 class JvmHostServices(
     private val creds: Credentials?,
     userAgent: String = DEFAULT_UA,
+    override val storage: KeyValueStore = InMemoryKeyValueStore(),
 ) : HostServices {
 
     private val client: HttpClient = HttpClient.newBuilder()
@@ -49,14 +54,6 @@ class JvmHostServices(
         }
     }
 
-    override val storage: KeyValueStore = object : KeyValueStore {
-        private val map = HashMap<String, String>()
-        override fun get(key: String) = map[key]
-        override fun put(key: String, value: String) { map[key] = value }
-        override fun remove(key: String) { map.remove(key) }
-        override fun clear() = map.clear()
-    }
-
     override fun credentials(): Credentials? = creds
 
     override fun log(level: LogLevel, message: String, error: Throwable?) {
@@ -69,4 +66,12 @@ class JvmHostServices(
             "Mozilla/5.0 (X11; Linux x86_64; rv:137.0) Gecko/20100101 Firefox/137.0"
         private val RESTRICTED = setOf("host", "connection", "content-length", "expect", "upgrade")
     }
+}
+
+class InMemoryKeyValueStore : KeyValueStore {
+    private val map = HashMap<String, String>()
+    override fun get(key: String) = map[key]
+    override fun put(key: String, value: String) { map[key] = value }
+    override fun remove(key: String) { map.remove(key) }
+    override fun clear() = map.clear()
 }

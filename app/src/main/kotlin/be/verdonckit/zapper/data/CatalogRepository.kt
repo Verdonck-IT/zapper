@@ -24,10 +24,8 @@ class CatalogRepository(
     suspend fun sync(plugin: LoadedPlugin, maxPagesPerCategory: Int = 6): SyncResult {
         val p = plugin.provider
         val id = p.info.id
-        if (p.info.requiresLogin && !p.isLoggedIn()) {
-            plugin.host.credentials()?.let { runCatching { p.login(it) } }
-            if (!p.isLoggedIn()) return SyncResult.Skipped(id, "niet ingelogd")
-        }
+        // isLoggedIn() vernieuwt tokens en logt zo nodig zelf stil in (met pauze na mislukte pogingen).
+        if (p.info.requiresLogin && !p.isLoggedIn()) return SyncResult.Skipped(id, "niet ingelogd")
 
         // Zelfde programma kan in meerdere native categorieën zitten: samenvoegen.
         val merged = LinkedHashMap<String, Pair<CatalogItem, Int>>()

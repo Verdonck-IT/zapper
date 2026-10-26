@@ -5,7 +5,7 @@ name: Plugins publiceren
 on:
   push:
     branches: [main]
-    paths: ["plugins/**", "provider-api/**", "tools/publish/**"]
+    paths: ["plugins/**", "plugin-shared/**", "provider-api/**", "tools/publish/**"]
   workflow_dispatch:
 
 concurrency: publish-dist

@@ -6,18 +6,37 @@ import be.verdonckit.zapper.api.HostServices
 import be.verdonckit.zapper.api.HttpRequest
 import be.verdonckit.zapper.api.LoginFailure
 import be.verdonckit.zapper.api.LoginResult
+import be.verdonckit.zapper.api.LogLevel
 import be.verdonckit.zapper.api.ProviderException
+import be.verdonckit.zapper.plugins.play.shared.LoginGuard
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.json.JSONObject
 
 /**
  * Login bij Play via AWS Cognito (USER_SRP_AUTH), zoals de Kodi-add-on plugin.video.play.
  * De API gebruikt het IdToken als Bearer (1 u geldig); het RefreshToken (30 dagen) vernieuwt het.
  * Tokens staan enkel in host.storage en worden nooit gelogd.
+ *
+ * Een mislukte login of refresh door netwerk of throttling laat de bestaande tokens staan;
+ * enkel een geweigerd RefreshToken wordt gewist. Stil inloggen is bewaakt door [LoginGuard].
  */
 internal class PlayAuth(private val host: HostServices) {
 
-    suspend fun login(creds: Credentials): LoginResult {
-        clear()
+    private val guard by lazy { LoginGuard(host.storage, host::nowMillis) }
+
+    /** Eén refresh of login tegelijk: parallelle calls (sync, rijen) wachten op dezelfde vernieuwing. */
+    private val tokenLock = Mutex()
+
+    /** Login die de gebruiker zelf vraagt (Instellingen, contracttest). */
+    suspend fun login(creds: Credentials): LoginResult = guardedLogin(creds, explicit = true)
+
+    private suspend fun guardedLogin(creds: Credentials, explicit: Boolean): LoginResult {
+        guard.check(creds, explicit)?.let { return LoginResult.Failure(it.reason, "Play: ${it.message}") }
+        return performLogin(creds).also { guard.record(creds, it) }
+    }
+
+    private suspend fun performLogin(creds: Credentials): LoginResult {
         return try {
             val srp = CognitoSrp(POOL_ID)
             val init = cognito(
@@ -63,24 +82,48 @@ internal class PlayAuth(private val host: HostServices) {
             answer.failure()?.let { return it }
             val result = answer.obj("AuthenticationResult")
                 ?: return LoginResult.Failure(LoginFailure.API_CHANGED, "Cognito: geen AuthenticationResult (${answer.str("ChallengeName")})")
+            if (result.str("RefreshToken") == null) return LoginResult.Failure(LoginFailure.API_CHANGED, "Cognito: geen RefreshToken")
             store(result)
-            if (host.storage.get(RT) == null) return LoginResult.Failure(LoginFailure.API_CHANGED, "Cognito: geen RefreshToken")
+            host.log(LogLevel.INFO, "Play: ingelogd met wachtwoord")
             LoginResult.Success
         } catch (e: ProviderException) {
-            LoginResult.Failure(if (e.kind == ErrorKind.NETWORK) LoginFailure.NETWORK else LoginFailure.UNKNOWN, e.message ?: "fout")
+            val reason = when (e.kind) {
+                ErrorKind.NETWORK -> LoginFailure.NETWORK
+                ErrorKind.API_CHANGED -> LoginFailure.API_CHANGED
+                else -> LoginFailure.UNKNOWN
+            }
+            LoginResult.Failure(reason, e.message ?: "fout")
         }
     }
-
-    fun hasSession(): Boolean = host.storage.get(RT) != null
 
     fun logout() = clear()
 
     /** Geldig IdToken; vernieuwt met het RefreshToken als het (bijna) verlopen is. */
-    suspend fun idToken(): String {
+    suspend fun idToken(): String = validIdToken() ?: tokenLock.withLock { validIdToken() ?: renewIdToken() }
+
+    private fun validIdToken(): String? {
         val exp = host.storage.get(EXP)?.toLongOrNull() ?: 0
-        host.storage.get(ID)?.takeIf { exp > host.nowMillis() + 60_000 }?.let { return it }
-        val rt = host.storage.get(RT) ?: throw ProviderException(ErrorKind.NOT_LOGGED_IN, "Play: niet ingelogd")
-        val resp = cognito(
+        return host.storage.get(ID)?.takeIf { exp > host.nowMillis() + 60_000 }
+    }
+
+    private suspend fun renewIdToken(): String {
+        host.storage.get(RT)?.let { rt -> refresh(rt)?.let { return it } }
+
+        // Geen of geweigerd RefreshToken: stil opnieuw inloggen met de bewaarde credentials.
+        val creds = host.credentials() ?: throw ProviderException(ErrorKind.NOT_LOGGED_IN, "Play: niet ingelogd")
+        when (val r = guardedLogin(creds, explicit = false)) {
+            is LoginResult.Success -> return host.storage.get(ID)
+                ?: throw ProviderException(ErrorKind.API_CHANGED, "Cognito login: geen IdToken")
+            is LoginResult.Failure -> {
+                host.log(LogLevel.WARN, "Play: stil inloggen mislukt (${r.reason}): ${r.message}")
+                throw ProviderException(LoginGuard.errorKind(r.reason), "Play login: ${r.message}")
+            }
+        }
+    }
+
+    /** Nieuw IdToken, of null als het RefreshToken geweigerd werd (dan is het gewist). Netwerkfouten gaan door. */
+    private suspend fun refresh(rt: String): String? {
+        val resp = cognito( // gooit NETWORK bij IO-fouten en 5xx: RefreshToken blijft
             "InitiateAuth",
             JSONObject()
                 .put("AuthFlow", "REFRESH_TOKEN")
@@ -88,14 +131,20 @@ internal class PlayAuth(private val host: HostServices) {
                 .put("AuthParameters", JSONObject().put("REFRESH_TOKEN", rt)),
         )
         resp.failure()?.let { f ->
-            // RefreshToken verlopen of ingetrokken: opnieuw inloggen met de bewaarde credentials.
-            val creds = host.credentials()
-            if (creds != null && login(creds) is LoginResult.Success) return host.storage.get(ID)!!
-            throw ProviderException(ErrorKind.NOT_LOGGED_IN, "Play: sessie verlopen (${f.message})")
+            when (f.reason) {
+                LoginFailure.NETWORK -> throw ProviderException(ErrorKind.NETWORK, "Cognito refresh: ${f.message}")
+                LoginFailure.INVALID_CREDENTIALS -> {
+                    host.log(LogLevel.WARN, "Play: refresh token geweigerd")
+                    clear()
+                    return null
+                }
+                else -> throw ProviderException(ErrorKind.API_CHANGED, "Cognito refresh: ${f.message}")
+            }
         }
         val result = resp.obj("AuthenticationResult")
             ?: throw ProviderException(ErrorKind.API_CHANGED, "Cognito refresh: geen AuthenticationResult")
         store(result)
+        host.log(LogLevel.INFO, "Play: sessie vernieuwd met refresh token")
         return host.storage.get(ID) ?: throw ProviderException(ErrorKind.API_CHANGED, "Cognito refresh: geen IdToken")
     }
 
@@ -137,14 +186,14 @@ internal class PlayAuth(private val host: HostServices) {
         }
     }
 
-    /** Cognito-fouten komen als {"__type": "...", "message": "..."}. */
+    /** Cognito-fouten komen als {"__type": "...", "message": "..."}. Throttling zet meteen de login-pauze. */
     private fun JSONObject.failure(): LoginResult.Failure? {
         val type = str("__type") ?: return null
         val message = str("message") ?: type
         val reason = when {
             "NotAuthorized" in type || "UserNotFound" in type -> LoginFailure.INVALID_CREDENTIALS
             "UserNotConfirmed" in type || "PasswordResetRequired" in type -> LoginFailure.ACCOUNT_PROBLEM
-            "TooManyRequests" in type || "LimitExceeded" in type -> LoginFailure.NETWORK
+            "TooManyRequests" in type || "LimitExceeded" in type -> LoginFailure.NETWORK.also { guard.backOff() }
             else -> LoginFailure.API_CHANGED
         }
         return LoginResult.Failure(reason, "Play: $message")

@@ -151,6 +151,7 @@ private fun ProviderCard(
             !status.requiresLogin -> "Geen login nodig"
             status.loggedIn == true -> "Ingelogd${status.username?.let { " als $it" } ?: ""}"
             status.loggedIn == false -> "Niet ingelogd"
+            status.offline -> "Tijdelijk niet bereikbaar (offline of login even gepauzeerd)"
             else -> "Status onbekend"
         }
         Text(loginText, color = if (status.loggedIn == true) ZapperColors.Success else ZapperColors.TextSecondary)

@@ -56,6 +56,11 @@ Klaar:
 - Live tv-volgorde: `liveOrder` in categories.json (op titel, populairste eerst naar CIM-marktaandeel; schatting,
   geen officiële jaartabel 2025 gevonden). Onbekende zenders achteraan.
 - Beelden: fallback-keten (liggend → staand → titel-art → gegenereerde titelkaart in merkkleur).
+- Login (26/10/2026): refresh token eerst, wachtwoord als stille terugval, bewaakt door `LoginGuard`
+  (`plugin-shared/`, als bron per plugin gecompileerd): netwerk/throttling wist geen tokens meer, oplopende pauze
+  15 min → 1 u → 4 u, geweigerde credentials niet automatisch opnieuw. `isLoggedIn()` gooit NETWORK i.p.v. false
+  bij tijdelijke fouten. Testkit bewaart tokens + credentials in `~/.zapper/testkit/` (zie docs/TECHNISCH.md).
+  Unit tests zonder netwerk: `VrtAuthTest`, `LoginGuardTest`, `PlayAuthTest`. Nog niet live/op toestel getest.
 
 Geverifieerd: provider-api + VRT-plugin + testkit compileren (Kotlin 2.1); cookie-jar; ECDSA-signatuur Python→Java;
 `./gradlew :app:assembleDebug` slaagt (21/10/2026, zonder compileerfouten of -waarschuwingen) en `./gradlew test` is groen.
@@ -84,3 +89,5 @@ Volgende stappen (in deze volgorde):
 - `./gradlew test` – unit tests; contracttests worden overgeslagen zonder credentials.
 - Live: `VRTMAX_USERNAME=… VRTMAX_PASSWORD=… ./gradlew :plugins:vrtmax:test`
   → rapport in `plugins/vrtmax/build/health/vrtmax.json`. Zelfde voor Play met `PLAY_USERNAME/PLAY_PASSWORD` en `:plugins:play:test`.
+  Credentials mogen ook in `~/.zapper/testkit/credentials.properties`; tokens blijven in `~/.zapper/testkit/<zender>.properties`
+  bewaard, dus herhaald testen gebruikt het refresh token en logt niet telkens met wachtwoord in.

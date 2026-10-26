@@ -164,9 +164,7 @@ class PluginManager(
             val ok = p.nativeCategories().isNotEmpty()
             return SelfTestResult(p.info.id, listOf(SelfTestStep("load", ok, if (ok) "geladen (geen login om verder te testen)" else "geen categorieën")))
         }
-        if (p.info.requiresLogin && !p.isLoggedIn()) {
-            plugin.host.credentials()?.let { runCatching { p.login(it) } }
-        }
+        // Geen expliciete login: de stap "login" (isLoggedIn) vernieuwt of logt zelf stil in.
         return ProviderSelfTest.run(p, plugin.host.http)
     }
 

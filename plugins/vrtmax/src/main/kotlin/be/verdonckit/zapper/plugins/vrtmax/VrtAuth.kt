@@ -11,6 +11,9 @@ import be.verdonckit.zapper.api.ProviderException
 import be.verdonckit.zapper.api.get
 import be.verdonckit.zapper.api.postJson
 import be.verdonckit.zapper.api.support.parseSetCookies
+import be.verdonckit.zapper.plugins.vrtmax.shared.LoginGuard
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.json.JSONObject
 import java.net.URI
 import java.time.Instant
@@ -25,20 +28,29 @@ import javax.crypto.spec.SecretKeySpec
  *  - video token (`vrtnu-site_profile_vt`) als identity voor de player token
  *  - vrtPlayerToken voor de media-aggregator (per variant: ondemand / live)
  *
+ * Volgorde bij een verlopen access token: refresh token → stil inloggen met de bewaarde
+ * credentials (bewaakt door [LoginGuard]). Een netwerkfout laat de sessie ongemoeid.
+ *
  * Flow afgeleid van plugin.video.vrt.nu (add-ons/plugin.video.vrt.nu, GPLv3).
  */
 internal class VrtAuth(private val host: HostServices) {
 
     private val http get() = host.http
     private val store get() = host.storage
+    private val guard by lazy { LoginGuard(host.storage, host::nowMillis) }
+
+    /** Eén refresh of login tegelijk: parallelle calls (sync, rijen) wachten op dezelfde vernieuwing. */
+    private val tokenLock = Mutex()
 
     // ---------- Login ----------
 
-    suspend fun login(creds: Credentials): LoginResult =
-        performLogin(creds).also { r ->
-            if (r is LoginResult.Success) store.remove(AUTO_LOGIN_BLOCKED_UNTIL)
-            else store.put(AUTO_LOGIN_BLOCKED_UNTIL, (host.nowMillis() + AUTO_LOGIN_COOLDOWN_MS).toString())
-        }
+    /** Login die de gebruiker zelf vraagt (Instellingen, contracttest). */
+    suspend fun login(creds: Credentials): LoginResult = guardedLogin(creds, explicit = true)
+
+    private suspend fun guardedLogin(creds: Credentials, explicit: Boolean): LoginResult {
+        guard.check(creds, explicit)?.let { return LoginResult.Failure(it.reason, "VRT MAX: ${it.message}") }
+        return performLogin(creds).also { guard.record(creds, it) }
+    }
 
     private suspend fun performLogin(creds: Credentials): LoginResult {
         http.clearCookies()
@@ -55,6 +67,7 @@ internal class VrtAuth(private val host: HostServices) {
             val resp = http.postJson(SSO_LOGIN, payload, headers = mapOf("OIDCXSRF" to xsrf))
             // Te veel logins kort na elkaar: VRT antwoordt dan met 5xx of 429 (tijdelijk, geen API-wijziging).
             if (resp.code >= 500 || resp.code == 429) {
+                guard.backOff()
                 return LoginResult.Failure(
                     LoginFailure.NETWORK,
                     "VRT-login tijdelijk niet beschikbaar (HTTP ${resp.code}). Probeer over enkele minuten opnieuw.",
@@ -87,9 +100,8 @@ internal class VrtAuth(private val host: HostServices) {
             val next = r1.header("location") ?: return apiChanged("callback gaf geen redirect (HTTP ${r1.code})")
             val r2 = http.get(resolve(redirect, next), headers, followRedirects = false)
 
-            absorbTokens(r1, r2)
-            if (store.get(AT) == null) return apiChanged("geen access token ontvangen na login")
-            host.log(LogLevel.INFO, "VRT MAX: ingelogd")
+            if (AT !in absorbTokens(r1, r2)) return apiChanged("geen access token ontvangen na login")
+            host.log(LogLevel.INFO, "VRT MAX: ingelogd met wachtwoord")
             return LoginResult.Success
         } catch (e: ProviderException) {
             throw e
@@ -103,8 +115,6 @@ internal class VrtAuth(private val host: HostServices) {
         http.clearCookies()
     }
 
-    fun hasSession(): Boolean = valid(RT) != null || valid(AT) != null
-
     // ---------- Tokens ----------
 
     suspend fun accessToken(): String = profileToken(AT)
@@ -116,39 +126,58 @@ internal class VrtAuth(private val host: HostServices) {
         store.remove("$VT.exp")
     }
 
-    private suspend fun profileToken(name: String): String {
-        valid(name)?.let { return it }
-        if (refresh()) valid(name)?.let { return it }
+    private suspend fun profileToken(name: String): String =
+        valid(name) ?: tokenLock.withLock { valid(name) ?: renewAndGet(name) }
+
+    private suspend fun renewAndGet(name: String): String {
+        when (refresh()) {
+            Refresh.OK -> valid(name)?.let { return it }
+            // Sessie is (waarschijnlijk) nog goed; niet inloggen, gewoon later opnieuw proberen.
+            Refresh.UNAVAILABLE -> throw ProviderException(ErrorKind.NETWORK, "VRT MAX: tokens vernieuwen lukt nu niet (netwerk of VRT)")
+            Refresh.NO_TOKEN, Refresh.REJECTED -> Unit
+        }
         val creds = host.credentials()
             ?: throw ProviderException(ErrorKind.NOT_LOGGED_IN, "VRT MAX: niet ingelogd")
-        // Niet bij elke call opnieuw inloggen als dat net mislukte: VRT blokkeert dan nog langer.
-        val blockedUntil = store.get(AUTO_LOGIN_BLOCKED_UNTIL)?.toLongOrNull() ?: 0
-        if (host.nowMillis() < blockedUntil) {
-            throw ProviderException(ErrorKind.NOT_LOGGED_IN, "VRT MAX: automatisch inloggen even gepauzeerd na een mislukte poging")
-        }
-        when (val r = login(creds)) {
+        when (val r = guardedLogin(creds, explicit = false)) {
             is LoginResult.Success -> return valid(name)
                 ?: throw ProviderException(ErrorKind.API_CHANGED, "token $name ontbreekt na login")
-            is LoginResult.Failure -> throw ProviderException(
-                if (r.reason == LoginFailure.API_CHANGED) ErrorKind.API_CHANGED else ErrorKind.NOT_LOGGED_IN,
-                "VRT MAX login: ${r.message}",
-            )
+            is LoginResult.Failure -> {
+                host.log(LogLevel.WARN, "VRT MAX: stil inloggen mislukt (${r.reason}): ${r.message}")
+                throw ProviderException(LoginGuard.errorKind(r.reason), "VRT MAX login: ${r.message}")
+            }
         }
     }
 
-    private suspend fun refresh(): Boolean {
-        val rt = store.get(RT) ?: return false
-        val resp = http.get(SSO_REFRESH, headers = mapOf("Cookie" to "$RT=$rt"))
-        if (!resp.isSuccessful && !resp.isRedirect) {
-            host.log(LogLevel.WARN, "VRT MAX: refresh faalde (HTTP ${resp.code})")
-            return false
+    private enum class Refresh { OK, NO_TOKEN, REJECTED, UNAVAILABLE }
+
+    private suspend fun refresh(): Refresh {
+        val rt = store.get(RT) ?: return Refresh.NO_TOKEN
+        // Lege jar: zo komen enkel tokens uit dít antwoord binnen, geen oude uit een eerdere login.
+        http.clearCookies()
+        val resp = try {
+            http.get(SSO_REFRESH, headers = mapOf("Cookie" to "$RT=$rt"))
+        } catch (e: java.io.IOException) {
+            host.log(LogLevel.WARN, "VRT MAX: refresh niet bereikbaar (${e::class.simpleName})")
+            return Refresh.UNAVAILABLE
         }
-        absorbTokens(resp)
-        return valid(AT) != null
+        if (resp.code >= 500 || resp.code == 429) {
+            host.log(LogLevel.WARN, "VRT MAX: refresh tijdelijk niet beschikbaar (HTTP ${resp.code})")
+            return Refresh.UNAVAILABLE
+        }
+        if ((resp.isSuccessful || resp.isRedirect) && AT in absorbTokens(resp)) {
+            host.log(LogLevel.INFO, "VRT MAX: sessie vernieuwd met refresh token")
+            return Refresh.OK
+        }
+        // 4xx of geen nieuw access token: refresh token is verlopen of ingetrokken.
+        host.log(LogLevel.WARN, "VRT MAX: refresh token geweigerd (HTTP ${resp.code})")
+        store.remove(RT)
+        store.remove("$RT.exp")
+        return Refresh.REJECTED
     }
 
-    /** Haalt at/rt/vt uit Set-Cookie headers en valt terug op de cookie-jar. */
-    private fun absorbTokens(vararg responses: HttpResponse) {
+    /** Haalt at/rt/vt uit Set-Cookie headers en valt terug op de cookie-jar. Geeft terug welke tokens binnenkwamen. */
+    private fun absorbTokens(vararg responses: HttpResponse): Set<String> {
+        val absorbed = HashSet<String>()
         val now = host.nowMillis()
         val fromHeaders = responses.flatMap { parseSetCookies(it.setCookieHeaders()).entries }.associate { it.key to it.value }
         val jar = http.cookies("https://www.vrt.be/vrtmax/") + http.cookies("https://www.vrt.be/vrtnu/")
@@ -162,7 +191,9 @@ internal class VrtAuth(private val host: HostServices) {
             }
             store.put(name, value)
             store.put("$name.exp", (now + ttl).toString())
+            absorbed += name
         }
+        return absorbed
     }
 
     // ---------- Player token ----------
@@ -268,8 +299,6 @@ internal class VrtAuth(private val host: HostServices) {
         const val PLAYERTOKEN_URL = "https://media-services-public.vrt.be/vualto-video-aggregator-web/rest/external/v2/tokens"
         const val PLAYER_LIB = "https://player.vrt.be/vrtmax/js/player-lib.js"
 
-        private const val AUTO_LOGIN_BLOCKED_UNTIL = "autologin.blockedUntil"
-        private const val AUTO_LOGIN_COOLDOWN_MS = 15 * 60_000L
         const val AT = "vrtnu-site_profile_at"
         const val RT = "vrtnu-site_profile_rt"
         const val VT = "vrtnu-site_profile_vt"

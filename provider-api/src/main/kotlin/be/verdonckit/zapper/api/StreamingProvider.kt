@@ -22,8 +22,14 @@ interface StreamingProvider {
     /** Wordt exact één keer aangeroepen, vóór alle andere methodes. */
     fun attach(host: HostServices)
 
+    /** Expliciete login (de gebruiker vraagt het). Stil opnieuw inloggen doet de plugin zelf, met [HostServices.credentials]. */
     suspend fun login(credentials: Credentials): LoginResult
 
+    /**
+     * Geldige sessie? Mag tokens vernieuwen of stil opnieuw inloggen. Een tijdelijke fout
+     * (netwerk, throttling) gooit [ProviderException] met [ErrorKind.NETWORK] in plaats van `false`:
+     * dat is "offline", niet "uitgelogd".
+     */
     suspend fun isLoggedIn(): Boolean
 
     suspend fun logout()

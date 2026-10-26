@@ -39,8 +39,17 @@ class VrtMaxProvider : StreamingProvider {
 
     override suspend fun login(credentials: Credentials): LoginResult = auth.login(credentials)
 
-    override suspend fun isLoggedIn(): Boolean =
-        auth.hasSession() && runCatching { auth.accessToken() }.isSuccess
+    /**
+     * Vernieuwt of logt zo nodig stil opnieuw in. Enkel "niet ingelogd" geeft false; tijdelijke fouten
+     * (NETWORK: offline, throttling, login-pauze) en API_CHANGED gaan door als exception.
+     */
+    override suspend fun isLoggedIn(): Boolean = try {
+        auth.accessToken()
+        true
+    } catch (e: ProviderException) {
+        if (e.kind != ErrorKind.NOT_LOGGED_IN) throw e
+        false
+    }
 
     override suspend fun logout() = auth.logout()
 

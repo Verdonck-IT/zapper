@@ -68,6 +68,22 @@ de app speelt af via de Widevine-CDM van het toestel.
 - **Focus & WTV** – enkel de twee livestreams, zonder login: de HLS-URL komt uit de embed-speler
   van focus-wtv.be/focus-live en /wtv-live, met een vaste URL als terugval.
 
+## Login en sessies
+
+- **Op het toestel**: gebruikersnaam en wachtwoord staan versleuteld in `SecureStore("credentials")`, de tokens
+  per zender in `SecureStore("tokens")` (AES-GCM, sleutel in de Android Keystore). Enkel "Uitloggen" wist ze.
+- **Volgorde** bij een verlopen token: refresh token (VRT `sso/refresh`, Play Cognito `REFRESH_TOKEN`) →
+  stil opnieuw inloggen met de bewaarde credentials. De app roept zelf nooit `login()` aan buiten Instellingen;
+  `isLoggedIn()` doet het vernieuwen.
+- **Tijdelijke fouten** (geen netwerk, 5xx, 429/TooManyRequests) laten het refresh token staan; `isLoggedIn()`
+  gooit dan `ProviderException(NETWORK)` en Instellingen toont "Tijdelijk niet bereikbaar". Enkel een
+  geweigerd refresh token wordt gewist.
+- **`LoginGuard`** (`plugin-shared/`, als bron in elke plugin gecompileerd met een eigen package) beschermt het
+  account: na throttling of een onverwacht antwoord een oplopende pauze (15 min → 1 u → 4 u); geweigerde
+  credentials worden niet automatisch opnieuw geprobeerd tot je in Instellingen opnieuw inlogt.
+  Netwerkfouten tellen niet mee. Gedeelde plugin-code gaat bewust niet in provider-api: dat zou
+  `PROVIDER_API_VERSION` en een app-release vragen.
+
 ## Categorieën en volgorde
 
 `app/src/main/assets/categories.json` bepaalt de rijen op het startscherm:
@@ -167,6 +183,18 @@ VRTMAX_USERNAME=… VRTMAX_PASSWORD=… ./gradlew :plugins:vrtmax:test
 PLAY_USERNAME=… PLAY_PASSWORD=… ./gradlew :plugins:play:test
 ./gradlew :plugins:focuswtv:test     # geen login nodig; in CI enkel met LIVE_TESTS=1
 ```
+
+Contracttests loggen in zoals de app, zodat herhaald testen het account niet blokkeert:
+
+- Credentials uit de env-variabelen, of anders uit `~/.zapper/testkit/credentials.properties`
+  (`VRTMAX_USERNAME=…`, `VRTMAX_PASSWORD=…`, `PLAY_USERNAME=…`, …). Staat dat bestand er, dan draaien
+  de contracttests ook mee met `./gradlew test`.
+- Tokens en login-pauze per zender in `~/.zapper/testkit/<zender>.properties`: meestal volstaat het
+  refresh token, enkel als dat niet meer werkt logt de plugin met het wachtwoord in. Ander pad via
+  `ZAPPER_TESTKIT_DIR`. Beide bestanden staan buiten de repo; nooit committen of delen.
+- De test roept nooit zelf `login()` aan. Is inloggen tijdelijk onmogelijk (netwerk, throttling, pauze),
+  dan wordt hij overgeslagen zonder rapport. Werd de login geweigerd, dan start de nachtelijke check
+  geen HAR-opname of fix-agent (die zouden opnieuw inloggen).
 
 ## Een zender toevoegen (bv. VTM GO)
 

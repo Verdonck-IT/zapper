@@ -78,8 +78,12 @@ jobs:
           for f in .agent/health/*.json; do
             id=$(basename "$f" .json)
             if ! jq -e '.ok' "$f" > /dev/null; then
+              # Login geweigerd (fout wachtwoord, account): geen codeprobleem, en HAR/fix-agent zouden
+              # opnieuw inloggen. Tijdelijke loginproblemen geven geen rapport (test overgeslagen).
+              if jq -e '.steps[0] | .name == "login" and (.detail | startswith("niet ingelogd"))' "$f" > /dev/null; then
+                echo "$id: login geweigerd, credentials nakijken (geen fix-agent)"
               # Al een open auto-fix PR? Dan niet nog een starten.
-              if [ -n "$(gh pr list --label auto-fix --search "$id in:title" --json number --jq '.[].number')" ]; then
+              elif [ -n "$(gh pr list --label auto-fix --search "$id in:title" --json number --jq '.[].number')" ]; then
                 echo "$id: er staat al een auto-fix PR open, overslaan"
               else
                 failing="$failing $id"

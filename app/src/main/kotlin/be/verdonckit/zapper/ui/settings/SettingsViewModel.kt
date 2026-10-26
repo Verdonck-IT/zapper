@@ -5,7 +5,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import be.verdonckit.zapper.AppGraph
 import be.verdonckit.zapper.api.Credentials
+import be.verdonckit.zapper.api.ErrorKind
 import be.verdonckit.zapper.api.LoginResult
+import be.verdonckit.zapper.api.ProviderException
 import be.verdonckit.zapper.plugin.UpdateOutcome
 import be.verdonckit.zapper.sync.MaintenanceWorker
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,6 +24,8 @@ data class ProviderStatus(
     val isDev: Boolean,
     val loggedIn: Boolean?,
     val requiresLogin: Boolean = true,
+    /** Sessie kon niet gecontroleerd worden: offline, throttling of login-pauze. Wordt later opnieuw geprobeerd. */
+    val offline: Boolean = false,
     val username: String?,
     val health: String?,
 )
@@ -41,12 +45,14 @@ class SettingsViewModel(private val app: Application, private val graph: AppGrap
 
     fun refresh() = viewModelScope.launch {
         val statuses = graph.plugins.plugins.value.values.map { p ->
+            val loginState = runCatching { p.provider.isLoggedIn() }
             ProviderStatus(
                 id = p.id,
                 name = p.name,
                 version = if (p.isDev) "dev" else p.version,
                 isDev = p.isDev,
-                loggedIn = runCatching { p.provider.isLoggedIn() }.getOrNull(),
+                loggedIn = loginState.getOrNull(),
+                offline = (loginState.exceptionOrNull() as? ProviderException)?.kind == ErrorKind.NETWORK,
                 requiresLogin = p.provider.info.requiresLogin,
                 username = graph.credentials.get(p.id)?.username,
                 health = graph.plugins.lastHealth(p.id)?.let(::summarize),
