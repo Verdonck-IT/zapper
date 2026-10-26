@@ -60,7 +60,12 @@ Klaar:
   (`plugin-shared/`, als bron per plugin gecompileerd): netwerk/throttling wist geen tokens meer, oplopende pauze
   15 min → 1 u → 4 u, geweigerde credentials niet automatisch opnieuw. `isLoggedIn()` gooit NETWORK i.p.v. false
   bij tijdelijke fouten. Testkit bewaart tokens + credentials in `~/.zapper/testkit/` (zie docs/TECHNISCH.md).
-  Unit tests zonder netwerk: `VrtAuthTest`, `LoginGuardTest`, `PlayAuthTest`. Nog niet live/op toestel getest.
+  Unit tests zonder netwerk: `VrtAuthTest`, `LoginGuardTest`, `PlayAuthTest`. Op emulator getest: VRT login met wachtwoord,
+  Play refresh met refresh token.
+- VRT-genres (26/10/2026): de oude zoeklijst-id's ("o%14|…|watch%") geven `list: null`; vrt.be/vrtmax/categorieen/ verwijst
+  nu naar /zoeken/. Catalogus per genre/type via GraphQL `pageSearch(input: {facets, mediaType: video})` → tabblad met
+  `tileContentType` "program", bladeren met `after` in dezelfde query. Kodi-add-on had nog geen fix (laatste commit 30/08/2026).
+  Op emulator: VRT-sync 1080 programma's (was 15).
 
 Geverifieerd: provider-api + VRT-plugin + testkit compileren (Kotlin 2.1); cookie-jar; ECDSA-signatuur Python→Java;
 `./gradlew :app:assembleDebug` slaagt (21/10/2026, zonder compileerfouten of -waarschuwingen) en `./gradlew test` is groen.

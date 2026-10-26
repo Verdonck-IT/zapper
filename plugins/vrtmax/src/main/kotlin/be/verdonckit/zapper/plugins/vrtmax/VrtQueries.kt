@@ -57,6 +57,32 @@ internal object VrtQueries {
         }
     """
 
+    /** Zoekpagina per facet (genre/type): tabbladen "Kijk", "Podcasts", … elk met een gepagineerde lijst. */
+    val PAGE_SEARCH = """
+        query PageSearch(${'$'}input: SearchInput, ${'$'}lazyItemCount: Int = 50, ${'$'}after: ID) {
+          pageSearch(input: ${'$'}input) {
+            __typename
+            ... on SearchResultPage {
+              components {
+                __typename
+                ... on ContainerNavigation {
+                  items {
+                    title
+                    components {
+                      __typename
+                      ... on PaginatedTileList {
+                        tileContentType
+                        paginatedItems(first: ${'$'}lazyItemCount, after: ${'$'}after) { $CONNECTION }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+    """
+
     private val LIST_FIELDS = """
         ... on PaginatedTileList { listId title tileContentType }
         ... on StaticTileList { listId title tileContentType }

@@ -59,18 +59,37 @@ class VrtMaxProvider : StreamingProvider {
 
     override suspend fun catalog(categoryId: String?, cursor: String?): Page<CatalogItem> {
         if (categoryId == LIVE) return Page(liveChannels(), null)
-        val listId = if (categoryId == POPULAR) popularListId() else searchListId(categoryId)
-
-        val vars = "{\"listId\":${jsonString(listId)},\"lazyItemCount\":$PAGE_SIZE" +
-            (cursor?.let { ",\"after\":${jsonString(it)}" } ?: "") + "}"
-        val data = api.graphql("TileList", VrtQueries.TILE_LIST, vars)
-        val conn = data.path("list", "paginatedItems")
-            ?: throw ProviderException(ErrorKind.API_CHANGED, "TileList zonder paginatedItems (categorie $categoryId)")
+        val conn = if (categoryId == POPULAR) popularConnection(cursor) else searchConnection(categoryId, cursor)
 
         val items = conn.arr("edges").objects().mapNotNull { it.obj("node") }
             .filter { it.str("__typename") == "ProgramTile" }
             .mapNotNull { programTile(it, categoryId) }
         return Page(items, nextCursor(conn))
+    }
+
+    private suspend fun popularConnection(cursor: String?): JSONObject {
+        val vars = "{\"listId\":${jsonString(popularListId())},\"lazyItemCount\":$PAGE_SIZE" +
+            (cursor?.let { ",\"after\":${jsonString(it)}" } ?: "") + "}"
+        return api.graphql("TileList", VrtQueries.TILE_LIST, vars).path("list", "paginatedItems")
+            ?: throw ProviderException(ErrorKind.API_CHANGED, "TileList zonder paginatedItems (populair)")
+    }
+
+    /**
+     * Genre of type, zoals de zoekpagina van de site (sinds oktober 2026; de oude zoeklijst-id's
+     * "o%14|…|watch%" geven null): `pageSearch` met de facet, dan het tabblad "Kijk (n)" =
+     * de lijst met `tileContentType` "program". Bladeren gebeurt in dezelfde query met `after`.
+     */
+    private suspend fun searchConnection(categoryId: String?, cursor: String?): JSONObject {
+        val vars = "{\"input\":${searchInput(categoryId)},\"lazyItemCount\":$PAGE_SIZE" +
+            (cursor?.let { ",\"after\":${jsonString(it)}" } ?: "") + "}"
+        val page = api.graphql("PageSearch", VrtQueries.PAGE_SEARCH, vars).obj("pageSearch")
+            ?: throw ProviderException(ErrorKind.API_CHANGED, "pageSearch gaf geen pagina (categorie $categoryId)")
+        return page.arr("components").objects()
+            .flatMap { it.arr("items").objects() }
+            .flatMap { it.arr("components").objects() }
+            .firstOrNull { it.str("tileContentType") == "program" }
+            ?.obj("paginatedItems")
+            ?: throw ProviderException(ErrorKind.API_CHANGED, "pageSearch zonder programmalijst (categorie $categoryId)")
     }
 
     /**
@@ -459,17 +478,13 @@ class VrtMaxProvider : StreamingProvider {
             LiveChannel("vualto_nieuws", "VRT NWS", null, "https://images.vrt.be/orig/logos/vrtnws.png"),
         )
 
-        /** VRT MAX zoeklijst-id: "$" + base64("o%14|<json>|watch%"), met Python-json.dumps-opmaak. */
-        internal fun searchListId(category: String?): String {
-            val facets = mutableListOf<String>()
-            if (category != null) {
+        /** SearchInput voor `pageSearch`, met dezelfde facetten als de knoppen op vrt.be/vrtmax/zoeken/. */
+        internal fun searchInput(category: String?): String {
+            val facets = if (category == null) "" else {
                 val facetName = if (category in setOf("docu", "films", "series", "talkshows")) "contenttype" else "genre"
-                facets += "{\"name\": \"$facetName\", \"values\": [${jsonString(category)}]}"
+                "{\"name\":\"$facetName\",\"values\":[${jsonString(category)}]}"
             }
-            facets += "{\"name\": \"entitytype\", \"values\": [\"video-program\"]}"
-            val search = "{\"facets\": [${facets.joinToString(", ")}], \"resultType\": \"watch\"}"
-            val raw = "o%14|$search|watch%"
-            return "$" + Base64.getEncoder().encodeToString(raw.toByteArray(Charsets.UTF_8))
+            return "{\"facets\":[$facets],\"mediaType\":\"video\"}"
         }
 
         internal fun programNameFromLink(link: String): String? =

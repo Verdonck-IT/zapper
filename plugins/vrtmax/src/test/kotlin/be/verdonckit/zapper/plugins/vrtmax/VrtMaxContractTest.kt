@@ -4,7 +4,6 @@ import be.verdonckit.zapper.testkit.ContractTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
-import java.util.Base64
 
 class VrtMaxContractTest : ContractTest("VRTMAX") {
 
@@ -19,13 +18,14 @@ class VrtMaxContractTest : ContractTest("VRTMAX") {
 class VrtMaxUnitTest {
 
     @Test
-    fun `zoeklijst-id is identiek aan die van de Kodi-add-on`() {
-        val id = VrtMaxProvider.searchListId("drama")
-        val decoded = String(Base64.getDecoder().decode(id.removePrefix("$")))
+    fun `zoekinput met dezelfde facetten als de knoppen op de zoekpagina`() {
         assertEquals(
-            "o%14|{\"facets\": [{\"name\": \"genre\", \"values\": [\"drama\"]}, " +
-                "{\"name\": \"entitytype\", \"values\": [\"video-program\"]}], \"resultType\": \"watch\"}|watch%",
-            decoded,
+            "{\"facets\":[{\"name\":\"genre\",\"values\":[\"humor\"]}],\"mediaType\":\"video\"}",
+            VrtMaxProvider.searchInput("humor"),
+        )
+        assertEquals(
+            "{\"facets\":[{\"name\":\"contenttype\",\"values\":[\"series\"]}],\"mediaType\":\"video\"}",
+            VrtMaxProvider.searchInput("series"),
         )
     }
 
