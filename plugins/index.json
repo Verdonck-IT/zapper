@@ -1,5 +1,6 @@
 {
-  "generatedAt": "2026-10-26T14:33:51+00:00",
+  "generatedAt": "2026-10-26T19:37:00+00:00",
+  "apiVersion": 5,
   "plugins": [
     {
       "id": "focuswtv",
@@ -12,6 +13,16 @@
       "sha256": "48535b560a551533da3acd468d77ec0b5087138c260b5cfe2cbcd396862abd94"
     },
     {
+      "id": "focuswtv",
+      "name": "Focus & WTV",
+      "build": 9,
+      "version": "2026.10.26.9",
+      "apiVersion": 5,
+      "entryClass": "be.verdonckit.zapper.plugins.focuswtv.FocusWtvProvider",
+      "file": "plugins/focuswtv/focuswtv-9.jar",
+      "sha256": "9ae8b6fc2c1dc031f5efd42490593dccb4521c15ba4870f03df9107b4fe4e0a7"
+    },
+    {
       "id": "play",
       "name": "Play",
       "build": 8,
@@ -22,6 +33,16 @@
       "sha256": "2a0e93fa7cc903641817cf9f71b610fc42b5d222ad9efad7e9600d7fa7863a03"
     },
     {
+      "id": "play",
+      "name": "Play",
+      "build": 9,
+      "version": "2026.10.26.9",
+      "apiVersion": 5,
+      "entryClass": "be.verdonckit.zapper.plugins.play.PlayProvider",
+      "file": "plugins/play/play-9.jar",
+      "sha256": "499d321922fa22e430846d6a12c80fcc1004406ad2f395337432025900e2f2cc"
+    },
+    {
       "id": "vrtmax",
       "name": "VRT MAX",
       "build": 8,
@@ -30,6 +51,26 @@
       "entryClass": "be.verdonckit.zapper.plugins.vrtmax.VrtMaxProvider",
       "file": "plugins/vrtmax/vrtmax-8.jar",
       "sha256": "031c0cd652e82b182f3cb9bbcbc23699cce0bb1489c91b0b6f423f0ed28324dc"
+    },
+    {
+      "id": "vrtmax",
+      "name": "VRT MAX",
+      "build": 9,
+      "version": "2026.10.26.9",
+      "apiVersion": 5,
+      "entryClass": "be.verdonckit.zapper.plugins.vrtmax.VrtMaxProvider",
+      "file": "plugins/vrtmax/vrtmax-9.jar",
+      "sha256": "eec66b7cf0fd12f57b0c0f3f46ccda0fa4a1a4747b65f91fa7805965e7451960"
+    },
+    {
+      "id": "vtmgo",
+      "name": "VTM GO",
+      "build": 9,
+      "version": "2026.10.26.9",
+      "apiVersion": 5,
+      "entryClass": "be.verdonckit.zapper.plugins.vtmgo.VtmGoProvider",
+      "file": "plugins/vtmgo/vtmgo-9.jar",
+      "sha256": "7af9316321ed962cb70041842e86ca20e0815826edfb4bebabb1acf57b0d74e0"
     }
   ]
 }
