@@ -31,6 +31,7 @@ import androidx.tv.material3.Text
 import be.verdonckit.zapper.graph
 import kotlinx.coroutines.flow.map
 import be.verdonckit.zapper.player.PlayerActivity
+import be.verdonckit.zapper.ui.components.bleedHorizontal
 import be.verdonckit.zapper.ui.components.BackToTop
 import be.verdonckit.zapper.ui.components.CardBadge
 import be.verdonckit.zapper.ui.components.ContentCard
@@ -71,10 +72,10 @@ fun LiveScreen(onBack: () -> Unit) {
         LazyVerticalGrid(
             columns = GridCells.Fixed(4),
             state = grid,
-            contentPadding = PaddingValues(top = 24.dp, bottom = 48.dp),
+            contentPadding = PaddingValues(start = 56.dp, end = 56.dp, top = 24.dp, bottom = 48.dp),
             horizontalArrangement = Arrangement.spacedBy(20.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp),
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.bleedHorizontal(56.dp, 56.dp).fillMaxSize(),
         ) {
             itemsIndexed(channels, key = { _, ch -> ch.key }) { index, ch ->
                 // Bijna zwart met een vleugje merkkleur: zenderlogo's (vaak in de merkkleur zelf) blijven leesbaar.

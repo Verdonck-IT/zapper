@@ -36,6 +36,7 @@ import androidx.tv.material3.Text
 import be.verdonckit.zapper.api.Episode
 import be.verdonckit.zapper.graph
 import be.verdonckit.zapper.player.PlayerActivity
+import be.verdonckit.zapper.ui.components.bleedHorizontal
 import be.verdonckit.zapper.ui.components.CardBadge
 import be.verdonckit.zapper.ui.components.ContentCard
 import be.verdonckit.zapper.ui.components.HeroBackdrop
@@ -130,7 +131,12 @@ fun DetailScreen(itemKey: String, onOpenEpisode: (itemKey: String, episode: Epis
                 Spacer(Modifier.height(20.dp))
                 val seasonRow = rememberLazyListState()
                 LaunchedEffect(state.selectedSeason) { seasonRow.animateScrollToItem(state.selectedSeason) }
-                LazyRow(state = seasonRow, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                LazyRow(
+                    state = seasonRow,
+                    contentPadding = PaddingValues(start = 56.dp, end = 56.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.bleedHorizontal(56.dp),
+                ) {
                     itemsIndexed(state.seasons, key = { _, s -> s.season.id }) { index, season ->
                         val selected = index == state.selectedSeason
                         Button(
@@ -153,8 +159,9 @@ fun DetailScreen(itemKey: String, onOpenEpisode: (itemKey: String, episode: Epis
                 LaunchedEffect(state.selectedSeason, nextIndex) { episodeRow.scrollToItem(nextIndex ?: 0) }
                 LazyRow(
                     state = episodeRow,
-                    contentPadding = PaddingValues(end = 56.dp, top = 8.dp, bottom = 24.dp),
+                    contentPadding = PaddingValues(start = 56.dp, end = 56.dp, top = 8.dp, bottom = 24.dp),
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    modifier = Modifier.bleedHorizontal(56.dp),
                 ) {
                     itemsIndexed(episodes, key = { _, ep -> ep.id }) { index, ep ->
                         EpisodeCard(

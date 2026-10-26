@@ -31,6 +31,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import be.verdonckit.zapper.data.ItemEntity
 import be.verdonckit.zapper.graph
+import be.verdonckit.zapper.ui.components.bleedHorizontal
 import be.verdonckit.zapper.ui.components.BackToTop
 import be.verdonckit.zapper.ui.components.ContentCard
 import be.verdonckit.zapper.ui.components.requestFocusAfterLayout
@@ -77,10 +78,10 @@ fun MyListScreen(onOpen: (ItemEntity) -> Unit, onBack: () -> Unit) {
         LazyVerticalGrid(
             columns = GridCells.Fixed(5),
             state = grid,
-            contentPadding = PaddingValues(top = 24.dp, bottom = 48.dp),
+            contentPadding = PaddingValues(start = 56.dp, end = 56.dp, top = 24.dp, bottom = 48.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp),
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.bleedHorizontal(56.dp, 56.dp).fillMaxSize(),
         ) {
             itemsIndexed(entries, key = { _, e -> e.key }) { index, e ->
                 val item = e.toItem()

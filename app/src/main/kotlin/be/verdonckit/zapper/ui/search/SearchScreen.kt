@@ -51,6 +51,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import be.verdonckit.zapper.data.ItemEntity
 import be.verdonckit.zapper.graph
+import be.verdonckit.zapper.ui.components.bleedHorizontal
 import be.verdonckit.zapper.ui.components.BackToTop
 import be.verdonckit.zapper.ui.components.ContentCard
 import be.verdonckit.zapper.ui.components.requestFocusAfterLayout
@@ -104,8 +105,8 @@ fun SearchScreen(onOpen: (ItemEntity) -> Unit, onBack: () -> Unit) {
         LazyRow(
             state = filterRow,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
-            contentPadding = PaddingValues(vertical = 4.dp),
-            modifier = Modifier.onFocusChanged { filtersFocused = it.hasFocus },
+            contentPadding = PaddingValues(horizontal = 56.dp, vertical = 4.dp),
+            modifier = Modifier.bleedHorizontal(56.dp, 56.dp).onFocusChanged { filtersFocused = it.hasFocus },
         ) {
             item(key = ALL_CHIP) {
                 FilterChip("Alles", selected = state.category == null, Modifier.focusRequester(chipFocus.getOrPut(ALL_CHIP) { FocusRequester() })) {
@@ -146,10 +147,10 @@ fun SearchScreen(onOpen: (ItemEntity) -> Unit, onBack: () -> Unit) {
         LazyVerticalGrid(
             columns = GridCells.Fixed(5),
             state = grid,
-            contentPadding = PaddingValues(top = 12.dp, bottom = 48.dp),
+            contentPadding = PaddingValues(start = 56.dp, end = 56.dp, top = 12.dp, bottom = 48.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp),
-            modifier = Modifier.fillMaxWidth().weight(1f),
+            modifier = Modifier.bleedHorizontal(56.dp, 56.dp).fillMaxWidth().weight(1f),
         ) {
             items(state.results, key = { it.key }) { item ->
                 ContentCard(
