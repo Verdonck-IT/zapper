@@ -20,8 +20,15 @@ fun BackToTop(atTop: () -> Boolean, toTop: suspend () -> Unit, onBackAtTop: () -
     }
 }
 
-/** Focus vragen nadat de lijst na het scrollen opnieuw opgemeten is (anders bestaat het element nog niet). */
-suspend fun FocusRequester.requestFocusAfterLayout() {
-    withFrameNanos { }
-    runCatching { requestFocus() }
+/**
+ * Focus vragen nadat de lijst na het scrollen opnieuw opgemeten is (anders bestaat het element nog niet).
+ * Met [isFocused]: enkele frames opnieuw proberen, want na een grote scrollsprong staat het element er
+ * soms pas later en valt de focus intussen op de dichtstbijzijnde kaart.
+ */
+suspend fun FocusRequester.requestFocusAfterLayout(isFocused: (() -> Boolean)? = null) {
+    repeat(if (isFocused == null) 1 else 10) {
+        withFrameNanos { }
+        runCatching { requestFocus() }
+        if (isFocused == null || isFocused()) return
+    }
 }

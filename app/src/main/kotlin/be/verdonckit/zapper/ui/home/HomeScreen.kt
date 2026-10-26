@@ -25,10 +25,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
@@ -60,6 +62,7 @@ import be.verdonckit.zapper.ui.components.requestFocusAfterLayout
 import be.verdonckit.zapper.ui.theme.ZapperColors
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun HomeScreen(onOpen: (ItemEntity) -> Unit, onNavigate: (SidebarDestination) -> Unit) {
     val context = LocalContext.current
@@ -77,13 +80,15 @@ fun HomeScreen(onOpen: (ItemEntity) -> Unit, onNavigate: (SidebarDestination) ->
     val scope = rememberCoroutineScope()
 
     // Per kaart een FocusRequester, zodat de focus na het sluiten van het menu terugkeert waar je was.
+    // De eerste kaart bovenaan heeft [firstCard] en staat hier bewust niet in: "Verder kijken" kan
+    // herschikken, en dan zou een andere kaart via deze map ook firstCard krijgen.
     val cardFocus = remember { HashMap<String, FocusRequester>() }
-    var lastFocusedCard by remember { mutableStateOf<String?>(null) }
+    var lastFocusedCard by remember { mutableStateOf<FocusRequester?>(null) }
 
     fun closeSidebar() {
         sidebarOpen = false
         scope.launch {
-            val target = lastFocusedCard?.let { cardFocus[it] } ?: firstCard
+            val target = lastFocusedCard ?: firstCard
             target.requestFocusAfterLayout()
         }
     }
@@ -94,7 +99,7 @@ fun HomeScreen(onOpen: (ItemEntity) -> Unit, onNavigate: (SidebarDestination) ->
         toTop = {
             listState.scrollToItem(0)
             firstRowState.scrollToItem(0)
-            firstCard.requestFocusAfterLayout()
+            firstCard.requestFocusAfterLayout { firstCardFocused }
         },
         onBackAtTop = { sidebarOpen = true },
     )
@@ -172,11 +177,16 @@ fun HomeScreen(onOpen: (ItemEntity) -> Unit, onNavigate: (SidebarDestination) ->
                                 )
                             }
                         }
+                        // ▲/▼ naar deze rij: terug naar de kaart waar je in deze rij stond, de eerste keer
+                        // naar de eerste kaart (niet de kaart die toevallig het dichtst bij staat).
+                        val rowFirst = if (rowIndex == 0) firstCard
+                        else cardFocus.getOrPut("${row.id}/${row.tiles.first().id}") { FocusRequester() }
                         DefaultScrollInside(defaultScroll) {
                         LazyRow(
                             state = if (rowIndex == 0) firstRowState else ownRowState,
                             contentPadding = PaddingValues(horizontal = 56.dp, vertical = 8.dp),
                             horizontalArrangement = Arrangement.spacedBy(14.dp),
+                            modifier = Modifier.focusRestorer { rowFirst },
                         ) {
                             items(row.tiles, key = { it.id }) { tile ->
                                 val isFirst = rowIndex == 0 && tile == row.tiles.first()
@@ -190,13 +200,12 @@ fun HomeScreen(onOpen: (ItemEntity) -> Unit, onNavigate: (SidebarDestination) ->
                                     providerLabel = state.providerNames[tile.providerId],
                                     progress = tile.progress,
                                     onClick = { activate(tile) },
-                                    onFocus = { focused = tile; lastFocusedCard = cardKey },
+                                    onFocus = { focused = tile; lastFocusedCard = requester },
                                     onLongClick = if (row.id == "continue" && tile.removable) ({ menuFor = tile }) else null,
                                     modifier = Modifier
                                         .focusRequester(requester)
                                         .then(if (isFirst) Modifier.onFocusChanged { firstCardFocused = it.isFocused } else Modifier),
                                 )
-                                if (isFirst) cardFocus[cardKey] = firstCard
                             }
                         }
                         }
