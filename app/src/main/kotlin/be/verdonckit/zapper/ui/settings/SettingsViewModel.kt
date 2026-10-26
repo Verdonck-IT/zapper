@@ -6,10 +6,13 @@ import androidx.lifecycle.viewModelScope
 import be.verdonckit.zapper.AppGraph
 import be.verdonckit.zapper.api.Credentials
 import be.verdonckit.zapper.api.ErrorKind
+import be.verdonckit.zapper.api.LoginMethod
 import be.verdonckit.zapper.api.LoginResult
 import be.verdonckit.zapper.api.ProviderException
 import be.verdonckit.zapper.plugin.UpdateOutcome
 import be.verdonckit.zapper.sync.MaintenanceWorker
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,6 +27,7 @@ data class ProviderStatus(
     val isDev: Boolean,
     val loggedIn: Boolean?,
     val requiresLogin: Boolean = true,
+    val loginMethod: LoginMethod = LoginMethod.PASSWORD,
     /** Sessie kon niet gecontroleerd worden: offline, throttling of login-pauze. Wordt later opnieuw geprobeerd. */
     val offline: Boolean = false,
     val username: String?,
@@ -34,6 +38,15 @@ data class SettingsState(
     val providers: List<ProviderStatus> = emptyList(),
     val message: String? = null,
     val busy: Boolean = false,
+    /** Lopende login met code: toon de code tot ze bevestigd is. */
+    val deviceLogin: DeviceLoginUi? = null,
+)
+
+data class DeviceLoginUi(
+    val providerId: String,
+    val userCode: String,
+    val verificationUrl: String,
+    val expiresAtMillis: Long,
 )
 
 class SettingsViewModel(private val app: Application, private val graph: AppGraph) : ViewModel() {
@@ -54,6 +67,7 @@ class SettingsViewModel(private val app: Application, private val graph: AppGrap
                 loggedIn = loginState.getOrNull(),
                 offline = (loginState.exceptionOrNull() as? ProviderException)?.kind == ErrorKind.NETWORK,
                 requiresLogin = p.provider.info.requiresLogin,
+                loginMethod = p.provider.info.loginMethod,
                 username = graph.credentials.get(p.id)?.username,
                 health = graph.plugins.lastHealth(p.id)?.let(::summarize),
             )
@@ -72,6 +86,42 @@ class SettingsViewModel(private val app: Application, private val graph: AppGrap
             }
             is LoginResult.Failure -> "Login mislukt (${r.reason}): ${r.message}"
         }
+    }
+
+    private var deviceJob: Job? = null
+
+    /** Login met code: code tonen, dan pollen tot de gebruiker ze op een ander toestel bevestigt of ze verloopt. */
+    fun startDeviceLogin(id: String) {
+        deviceJob?.cancel()
+        deviceJob = viewModelScope.launch {
+            val plugin = graph.plugins.get(id) ?: return@launch
+            val code = runCatching { plugin.provider.startDeviceLogin() }.getOrElse {
+                _state.update { s -> s.copy(message = "Code vragen bij ${plugin.name} mislukt: ${it.message}") }
+                return@launch
+            }
+            val expiresAt = System.currentTimeMillis() + code.expiresInSeconds * 1000L
+            _state.update { it.copy(deviceLogin = DeviceLoginUi(id, code.userCode, code.verificationUrl, expiresAt), message = null) }
+            var outcome = "De code is verlopen. Vraag een nieuwe code."
+            while (System.currentTimeMillis() < expiresAt) {
+                delay(code.pollIntervalSeconds * 1000L)
+                when (val r = runCatching { plugin.provider.pollDeviceLogin() }.getOrNull()) {
+                    null -> continue
+                    is LoginResult.Success -> {
+                        MaintenanceWorker.runNow(app)
+                        outcome = "Ingelogd bij ${plugin.name}. De catalogus wordt nu opgebouwd."
+                    }
+                    is LoginResult.Failure -> outcome = "Login mislukt: ${r.message}"
+                }
+                break
+            }
+            _state.update { it.copy(deviceLogin = null, message = outcome) }
+            refresh()
+        }
+    }
+
+    fun cancelDeviceLogin() {
+        deviceJob?.cancel()
+        _state.update { it.copy(deviceLogin = null) }
     }
 
     fun logout(id: String) = busy("Uitloggen…") {

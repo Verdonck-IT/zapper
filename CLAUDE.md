@@ -62,6 +62,11 @@ Klaar:
   bij tijdelijke fouten. Testkit bewaart tokens + credentials in `~/.zapper/testkit/` (zie docs/TECHNISCH.md).
   Unit tests zonder netwerk: `VrtAuthTest`, `LoginGuardTest`, `PlayAuthTest`. Op emulator getest: VRT login met wachtwoord,
   Play refresh met refresh token.
+- VTM GO-plugin (`plugins/vtmgo`, 26/10/2026): provider-api v5 (`LoginMethod.DEVICE_CODE`, `startDeviceLogin()`,
+  `pollDeviceLogin()`); Instellingen toont code + login.vtm.be/androidtv en pollt. Catalogus uit de storefronts
+  (main/series/films/docu/kids) met `thema-*` uit rijtitels, details/seizoenen via `detail3`, live, Mijn lijst, streams via
+  `play-config` + DRMtoday (`acquireLicense`). Publieke API live verkend (catalogus/live/detail3 werken zonder login);
+  login, streams, licentie en Mijn lijst NOG NIET live getest. Referentie: fork frankdpGH/plugin.video.vtm.go (API 28).
 - VRT-genres (26/10/2026): de oude zoeklijst-id's ("o%14|…|watch%") geven `list: null`; vrt.be/vrtmax/categorieen/ verwijst
   nu naar /zoeken/. Catalogus per genre/type via GraphQL `pageSearch(input: {facets, mediaType: video})` → tabblad met
   `tileContentType` "program", bladeren met `after` in dezelfde query. Kodi-add-on had nog geen fix (laatste commit 30/08/2026).
@@ -82,7 +87,8 @@ Volgende stappen (in deze volgorde):
 1. ~~`./gradlew :app:assembleDebug` laten slagen.~~ Klaar.
 2. ~~Live contracttest VRT MAX.~~ Klaar, alle stappen groen.
 3. TMDB-verrijking (enkel aanvullen: ontbrekende beelden, jaar, omschrijving; koppelen op titel+jaar+type, gecachet per dedupKey; bij twijfel niet koppelen). Gebruiker moet nog een TMDB API-sleutel aanmaken. Geen AI voor categorieën (bewuste keuze).
-4. Plugin VTM GO; programma's op aanvraag voor Focus & WTV (stappen in README). Play: live contracttest met `PLAY_USERNAME/PASSWORD`.
+4. ~~Plugin VTM GO~~ gebouwd (zie status); live testen na login met code. Programma's op aanvraag voor Focus & WTV
+   (stappen in README). Play: live contracttest met `PLAY_USERNAME/PASSWORD`.
 
 ## Distributie
 - Repo is publiek: https://github.com/Verdonck-IT/zapper. Dist-site via GitHub Pages (branch `gh-pages`):

@@ -4,7 +4,7 @@ package be.verdonckit.zapper.api
  * Versie van het plugin-contract. Verhoog dit bij elke breaking change in deze module.
  * De host laadt enkel plugins waarvan `apiVersion` in het manifest exact gelijk is.
  */
-const val PROVIDER_API_VERSION = 4
+const val PROVIDER_API_VERSION = 5
 
 /**
  * Eén streamingplatform (VRT MAX, VTM GO, ...).
@@ -22,8 +22,22 @@ interface StreamingProvider {
     /** Wordt exact één keer aangeroepen, vóór alle andere methodes. */
     fun attach(host: HostServices)
 
-    /** Expliciete login (de gebruiker vraagt het). Stil opnieuw inloggen doet de plugin zelf, met [HostServices.credentials]. */
+    /**
+     * Expliciete login met e-mail en wachtwoord (de gebruiker vraagt het). Stil opnieuw inloggen doet
+     * de plugin zelf, met [HostServices.credentials]. Niet gebruikt bij [LoginMethod.DEVICE_CODE].
+     */
     suspend fun login(credentials: Credentials): LoginResult
+
+    /**
+     * Start een login met code ([LoginMethod.DEVICE_CODE]): de host toont [DeviceLogin.userCode]
+     * en de URL, de gebruiker bevestigt op een gsm of pc. Daarna [pollDeviceLogin] tot het lukt.
+     */
+    suspend fun startDeviceLogin(): DeviceLogin =
+        throw UnsupportedOperationException("${info.id} kent geen login met code")
+
+    /** Na [startDeviceLogin]: null = nog niet bevestigd, anders het resultaat (ook "code verlopen"). */
+    suspend fun pollDeviceLogin(): LoginResult? =
+        throw UnsupportedOperationException("${info.id} kent geen login met code")
 
     /**
      * Geldige sessie? Mag tokens vernieuwen of stil opnieuw inloggen. Een tijdelijke fout

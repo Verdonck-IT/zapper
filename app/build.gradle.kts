@@ -46,7 +46,7 @@ android {
                 "String",
                 "DEV_PLUGINS",
                 "\"be.verdonckit.zapper.plugins.vrtmax.VrtMaxProvider,be.verdonckit.zapper.plugins.play.PlayProvider," +
-                    "be.verdonckit.zapper.plugins.focuswtv.FocusWtvProvider\"",
+                    "be.verdonckit.zapper.plugins.focuswtv.FocusWtvProvider,be.verdonckit.zapper.plugins.vtmgo.VtmGoProvider\"",
             )
         }
         release {
@@ -82,6 +82,7 @@ dependencies {
     debugImplementation(project(":plugins:vrtmax"))
     debugImplementation(project(":plugins:play"))
     debugImplementation(project(":plugins:focuswtv"))
+    debugImplementation(project(":plugins:vtmgo"))
 
     implementation(libs.kotlinx.coroutines.android)
 

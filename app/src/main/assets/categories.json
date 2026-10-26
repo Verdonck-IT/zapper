@@ -11,8 +11,9 @@
   ],
   "liveOrder_doc": "Volgorde van de zenders op de pagina Live tv: populairste eerst, naar CIM-marktaandeel (Vlaanderen). Op titel; onbekende zenders komen achteraan.",
   "liveOrder": [
-    "VRT 1", "Play", "VRT Canvas", "Play Fictie", "Ketnet", "Play Crime", "Play Reality", "Play Actie",
-    "VRT NWS", "Sporza", "Focus", "WTV", "Nostalgie"
+    "VRT 1", "VTM", "Play", "VRT Canvas", "VTM 2", "VTM 4", "Play Fictie", "VTM 3", "Ketnet", "VTM GOLD",
+    "Play Crime", "Play Reality", "Play Actie", "VRT NWS", "Sporza", "Focus", "WTV", "Nostalgie",
+    "Qmusic", "JOE", "Willy", "TOP", "VTM Xmas"
   ],
 
   "categories": [
@@ -101,7 +102,13 @@
       "brand-play-actie": ["drama"],
       "brand-njam": ["lifestyle"]
     },
-    "vtmgo": {},
+    "vtmgo": {
+      "populair": ["popular"], "live": ["live"], "films": ["films"], "docu": ["docu"], "kids": ["kids"],
+      "series": [], "main": [],
+      "thema-drama": ["drama"], "thema-crime": ["crime"], "thema-truecrime": ["truecrime"], "thema-comedy": ["comedy"],
+      "thema-reality": ["reality"], "thema-lifestyle": ["lifestyle"], "thema-music": ["music"], "thema-sport": ["sport"],
+      "thema-news": ["news"], "thema-archive": ["archive"], "thema-kids": ["kids"], "thema-docu": ["docu"], "thema-films": ["films"]
+    },
     "focuswtv": {}
   },
 

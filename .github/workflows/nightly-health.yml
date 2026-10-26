@@ -24,6 +24,8 @@ jobs:
             env: PLAY
           - plugin: focuswtv
             env: FOCUSWTV # geen login nodig; secrets mogen leeg blijven
+          - plugin: vtmgo
+            env: VTMGO # login met code: eenmalig ZAPPER_DEVICE_LOGIN=1 op de runner, tokens in ~/.zapper/testkit/
           # Nieuwe provider? Voeg hier een regel toe + de secrets <ENV>_USERNAME/_PASSWORD.
     steps:
       - uses: actions/checkout@v4

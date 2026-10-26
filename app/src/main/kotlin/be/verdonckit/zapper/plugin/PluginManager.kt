@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import be.verdonckit.zapper.BuildConfig
 import be.verdonckit.zapper.api.HostServices
+import be.verdonckit.zapper.api.LoginMethod
 import be.verdonckit.zapper.api.PROVIDER_API_VERSION
 import be.verdonckit.zapper.api.StreamingProvider
 import be.verdonckit.zapper.api.support.ProviderSelfTest
@@ -160,7 +161,12 @@ class PluginManager(
      */
     suspend fun selfTest(plugin: LoadedPlugin): SelfTestResult {
         val p = plugin.provider
-        if (p.info.requiresLogin && plugin.host.credentials() == null) {
+        // Zonder login (geen wachtwoord bewaard, of nog nooit met code ingelogd) valt er niets verder te testen.
+        val canLogin = when (p.info.loginMethod) {
+            LoginMethod.PASSWORD -> plugin.host.credentials() != null
+            LoginMethod.DEVICE_CODE -> runCatching { p.isLoggedIn() }.getOrDefault(true)
+        }
+        if (p.info.requiresLogin && !canLogin) {
             val ok = p.nativeCategories().isNotEmpty()
             return SelfTestResult(p.info.id, listOf(SelfTestStep("load", ok, if (ok) "geladen (geen login om verder te testen)" else "geen categorieën")))
         }

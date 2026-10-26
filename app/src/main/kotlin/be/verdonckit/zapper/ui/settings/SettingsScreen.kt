@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,13 +41,16 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
+import be.verdonckit.zapper.api.LoginMethod
 import be.verdonckit.zapper.graph
+import kotlinx.coroutines.delay
 import be.verdonckit.zapper.ui.theme.ZapperColors
 
 @Composable
@@ -116,8 +120,13 @@ fun SettingsScreen(onBack: () -> Unit) {
             ProviderCard(
                 status = p,
                 showLogin = loginFor == p.id,
+                deviceLogin = state.deviceLogin?.takeIf { it.providerId == p.id },
                 busy = state.busy,
-                onLoginClick = { loginFor = if (loginFor == p.id) null else p.id },
+                onLoginClick = {
+                    if (p.loginMethod == LoginMethod.DEVICE_CODE) vm.startDeviceLogin(p.id)
+                    else loginFor = if (loginFor == p.id) null else p.id
+                },
+                onCancelDeviceLogin = vm::cancelDeviceLogin,
                 onLogin = { u, pw -> vm.login(p.id, u, pw); loginFor = null },
                 onLogout = { vm.logout(p.id) },
                 onTest = { vm.healthCheck(p.id) },
@@ -130,8 +139,10 @@ fun SettingsScreen(onBack: () -> Unit) {
 private fun ProviderCard(
     status: ProviderStatus,
     showLogin: Boolean,
+    deviceLogin: DeviceLoginUi?,
     busy: Boolean,
     onLoginClick: () -> Unit,
+    onCancelDeviceLogin: () -> Unit,
     onLogin: (String, String) -> Unit,
     onLogout: () -> Unit,
     onTest: () -> Unit,
@@ -159,13 +170,48 @@ private fun ProviderCard(
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             if (status.requiresLogin) {
-                Button(onClick = onLoginClick, enabled = !busy) { Text(if (status.loggedIn == true) "Opnieuw inloggen" else "Inloggen") }
+                Button(onClick = onLoginClick, enabled = !busy && deviceLogin == null) {
+                    Text(
+                        when {
+                            status.loggedIn == true -> "Opnieuw inloggen"
+                            status.loginMethod == LoginMethod.DEVICE_CODE -> "Inloggen met code"
+                            else -> "Inloggen"
+                        },
+                    )
+                }
                 if (status.loggedIn == true) OutlinedButton(onClick = onLogout, enabled = !busy) { Text("Uitloggen") }
             }
             OutlinedButton(onClick = onTest, enabled = !busy) { Text("Test plugin") }
         }
 
         if (showLogin) LoginForm(initialUser = status.username.orEmpty(), onSubmit = onLogin)
+        deviceLogin?.let { DeviceLoginPanel(it, onCancelDeviceLogin) }
+    }
+}
+
+/** Login met code: grote code en de URL, zoals de eigen TV-app van het platform. */
+@Composable
+private fun DeviceLoginPanel(login: DeviceLoginUi, onCancel: () -> Unit) {
+    val cancel = remember { FocusRequester() }
+    var remaining by remember { mutableStateOf(0L) }
+    LaunchedEffect(login) {
+        while (true) {
+            remaining = ((login.expiresAtMillis - System.currentTimeMillis()) / 1000).coerceAtLeast(0)
+            delay(1_000)
+        }
+    }
+    LaunchedEffect(login) { cancel.requestFocusAfterLayout() }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Ga op je gsm of computer naar", style = MaterialTheme.typography.bodyLarge, color = ZapperColors.TextSecondary)
+        Text(login.verificationUrl.removePrefix("https://"), style = MaterialTheme.typography.headlineSmall, color = Color.White)
+        Text("en geef deze code in:", style = MaterialTheme.typography.bodyLarge, color = ZapperColors.TextSecondary)
+        Text(login.userCode, style = MaterialTheme.typography.displayMedium.copy(letterSpacing = 8.sp), color = Color.White)
+        Text(
+            "Wachten op bevestiging… nog ${remaining / 60}:${(remaining % 60).toString().padStart(2, '0')}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = ZapperColors.TextSecondary,
+        )
+        OutlinedButton(onClick = onCancel, modifier = Modifier.focusRequester(cancel)) { Text("Annuleren") }
     }
 }
 

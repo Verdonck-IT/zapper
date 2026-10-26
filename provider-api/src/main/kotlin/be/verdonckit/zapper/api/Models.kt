@@ -17,6 +17,25 @@ data class ProviderInfo(
     val supportsMyList: Boolean = false,
     /** True = de plugin implementeert [StreamingProvider.removeFromContinueWatching]. */
     val supportsContinueRemoval: Boolean = false,
+    /** Hoe de gebruiker inlogt; enkel relevant als [requiresLogin]. */
+    val loginMethod: LoginMethod = LoginMethod.PASSWORD,
+)
+
+enum class LoginMethod {
+    /** E-mail en wachtwoord via [StreamingProvider.login]; de host bewaart ze voor stil opnieuw inloggen. */
+    PASSWORD,
+
+    /** Code op een ander toestel bevestigen (OAuth device flow); daarna enkel het refresh token. */
+    DEVICE_CODE,
+}
+
+/** Login met code: toon [userCode] en [verificationUrl]; [verificationUrlComplete] vult de code al in (bv. voor een QR-code). */
+data class DeviceLogin(
+    val userCode: String,
+    val verificationUrl: String,
+    val verificationUrlComplete: String? = null,
+    val expiresInSeconds: Int,
+    val pollIntervalSeconds: Int,
 )
 
 data class Credentials(val username: String, val password: String)

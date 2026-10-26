@@ -1,12 +1,12 @@
 # Zapper
 
 Eén Android TV-app voor de Vlaamse streamingplatformen, met een Netflix-achtige interface.
-VRT MAX, Play en de live-zenders van Focus en WTV staan samen in één app: door elkaar in gedeelde rijen
+VRT MAX, VTM GO, Play en de live-zenders van Focus en WTV staan samen in één app: door elkaar in gedeelde rijen
 (Fictie, Crime & thriller, Humor, Docu, …), met één "Verder kijken" en één "Mijn lijst" voor alle zenders.
 
 ![Startscherm](docs/screenshots/startscherm.jpg)
 
-> Persoonlijk project, niet gelinkt aan VRT, Play Media of Focus & WTV. Je kijkt met je eigen
+> Persoonlijk project, niet gelinkt aan VRT, DPG Media, Play Media of Focus & WTV. Je kijkt met je eigen
 > (gratis) accounts; DRM wordt niet omzeild.
 
 ## Wat kan Zapper?
@@ -28,10 +28,12 @@ VRT MAX, Play en de live-zenders van Focus en WTV staan samen in één app: door
 | Zender | Inhoud | Account |
 |---|---|---|
 | VRT MAX | programma's, films, live: VRT 1, VRT Canvas, Ketnet, Sporza, VRT NWS | gratis VRT-profiel |
+| VTM GO | programma's, films, live: VTM, VTM 2, VTM 3, VTM 4, VTM GOLD, … | gratis VTM GO-account (login met code) |
 | Play | programma's, films, live: Play, Play Fictie, Play Crime, Play Reality, Play Actie, Nostalgie | gratis Play-account |
 | Focus & WTV | live: Focus, WTV | geen login nodig |
 
-Play Kinepolis (huur- en koopfilms) zit er niet in. VTM GO volgt later.
+Play Kinepolis (huur- en koopfilms) zit er niet in. Bij VTM GO kan je enkel kijken wat je account toelaat:
+programma's van VTM GO+ of Streamz vragen een betalend abonnement.
 
 ## In beeld
 
@@ -66,6 +68,8 @@ Sta daarna *onbekende bronnen* toe voor Zapper zelf; zo kan de app zichzelf bijw
 
 1. Open Zapper, druk ◀ en kies **Instellingen**.
 2. Log in bij VRT MAX en Play met je eigen account. Focus & WTV heeft geen login nodig.
+   VTM GO werkt met een code, zoals de eigen TV-app: kies **Inloggen met code**, ga op je gsm of computer
+   naar **login.vtm.be/androidtv** en geef de code in die op de TV staat.
 3. Kies **Catalogus nu syncen**, of wacht even: de catalogus wordt automatisch opgebouwd.
 
 ## Bediening

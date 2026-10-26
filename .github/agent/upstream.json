@@ -15,5 +15,15 @@
       "resources/lib/play/aws/cognito_idp.py",
       "resources/lib/play/content.py"
     ]
+  },
+  "vtmgo": {
+    "repo": "frankdpGH/plugin.video.vtm.go",
+    "note": "Fork van add-ons/plugin.video.vtm.go; het origineel is sinds 2024 niet meer bijgewerkt.",
+    "relevant": [
+      "resources/lib/vtmgo/vtmgoauth.py",
+      "resources/lib/vtmgo/util.py",
+      "resources/lib/vtmgo/vtmgo.py",
+      "resources/lib/vtmgo/vtmgostream.py"
+    ]
   }
 }

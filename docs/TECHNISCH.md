@@ -44,7 +44,7 @@ Plugins leveren enkel logica: inloggen, catalogus, details, stream resolven. Net
 Fouten gaan via `ProviderException` met een `ErrorKind`; `API_CHANGED` betekent dat het platform
 gewijzigd is en is het signaal voor de health-check.
 
-Elke breaking change verhoogt `PROVIDER_API_VERSION` (nu **4**) en vraagt een app-release; de app
+Elke breaking change verhoogt `PROVIDER_API_VERSION` (nu **5**) en vraagt een app-release; de app
 laadt enkel plugins met exact dezelfde versie. Optionele mogelijkheden staan als vlag in `ProviderInfo`:
 
 | Vlag | Methodes | VRT MAX | Play | Focus & WTV |
@@ -53,6 +53,10 @@ laadt enkel plugins met exact dezelfde versie. Optionele mogelijkheden staan als
 | `supportsMyList` | `myList()`, `setInMyList()` | ✓ | ✓ | – |
 | `supportsContinueRemoval` | `removeFromContinueWatching()` | ✓ | ✓ | – |
 | `requiresLogin` | `login()`, `isLoggedIn()` | ✓ | ✓ | – (geen login) |
+| `loginMethod = DEVICE_CODE` | `startDeviceLogin()`, `pollDeviceLogin()` | – | – | – (enkel VTM GO) |
+
+VTM GO staat niet in de tabel: `requiresLogin`, `supportsMyList` en `loginMethod = DEVICE_CODE`; geen
+platformvoortgang (`syncsProgress`) en niets verwijderen uit "Verder kijken".
 
 DRM wordt nooit omzeild: plugins leveren een manifest en een Widevine-licentie-URL met headers,
 de app speelt af via de Widevine-CDM van het toestel.
@@ -65,6 +69,13 @@ de app speelt af via de Widevine-CDM van het toestel.
 - **Play** (vroeger GoPlay) – AWS Cognito-login (USER_SRP_AUTH, `CognitoSrp.kt`, bit voor bit getest
   tegen de Python-code van de add-on), A–Z-catalogus zonder Play Kinepolis (huren/kopen), "Kijk verder",
   Mijn lijst, Widevine via KeyOS. Afgeleid van [add-ons/plugin.video.play](https://github.com/add-ons/plugin.video.play).
+- **VTM GO** – login met code (OAuth device flow op login.vtm.be, client `vtm-go-androidtv`), daarna enkel het
+  refresh token (roteert bij elke vernieuwing). Catalogus: geen A–Z of genres meer, enkel thematische rijen per
+  storefront (`main`, `series`, `films`, `docu`, `kids`); de plugin leidt `thema-*` af uit de rijtitel voor de
+  mapping in categories.json. Details via `detail3` (seizoenen met `selectedSeasonIndex`), streams via
+  `play-config` (DASH, Widevine via DRMtoday met JSON-licentie, dus `acquireLicense`). De API weigert oude
+  app-versies (HTTP 426): `x-app-version`/User-Agent in `VtmGoAuth.API_HEADERS` bijwerken. Afgeleid van de fork
+  [frankdpGH/plugin.video.vtm.go](https://github.com/frankdpGH/plugin.video.vtm.go) (het origineel staat stil).
 - **Focus & WTV** – enkel de twee livestreams, zonder login: de HLS-URL komt uit de embed-speler
   van focus-wtv.be/focus-live en /wtv-live, met een vaste URL als terugval.
 
@@ -196,7 +207,13 @@ Contracttests loggen in zoals de app, zodat herhaald testen het account niet blo
   dan wordt hij overgeslagen zonder rapport. Werd de login geweigerd, dan start de nachtelijke check
   geen HAR-opname of fix-agent (die zouden opnieuw inloggen).
 
-## Een zender toevoegen (bv. VTM GO)
+Login met code (VTM GO) heeft geen credentials: log eenmalig in met
+`ZAPPER_DEVICE_LOGIN=1 ./gradlew :plugins:vtmgo:test --tests '*ContractTest*'`. De test toont de code in de console;
+bevestig ze op login.vtm.be/androidtv. Daarna staan de tokens in `~/.zapper/testkit/vtmgo.properties`. Zolang dat nooit
+gebeurde, wordt de test overgeslagen; is de sessie later kwijt, dan faalt hij met "niet ingelogd" (zonder fix-agent).
+Voor de nachtelijke check: één keer zo inloggen op de runner thuis.
+
+## Een zender toevoegen
 
 1. `plugins/<id>/` kopiëren van een bestaande plugin, `zapper-plugin.properties` aanpassen.
 2. `include(":plugins:<id>")` in `settings.gradle.kts`, `debugImplementation` en de entry class in `DEV_PLUGINS` (`app/build.gradle.kts`).
@@ -210,7 +227,7 @@ Contracttests loggen in zoals de app, zodat herhaald testen het account niet blo
 ## Bekende beperkingen
 
 - Het Widevine-niveau van de TV (L1/L3) bepaalt de maximale kwaliteit.
-- Nog niet gebouwd: VTM GO, programma's op aanvraag van Focus & WTV, EPG voor live tv,
+- Nog niet gebouwd: programma's op aanvraag van Focus & WTV, EPG voor live tv,
   automatisch de volgende aflevering na het einde.
 - De Play-plugin is enkel voor de publieke delen live getest; login, streams en voortgang
   vragen een account.
