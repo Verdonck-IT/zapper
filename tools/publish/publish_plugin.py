@@ -13,6 +13,11 @@ Resultaat:
   dist/plugins/index.json        (alle plugins, deze entry bijgewerkt)
   dist/plugins/index.json.sig    (base64 ECDSA-P256/SHA-256 over index.json)
 Oude jars blijven staan zodat de app kan terugrollen; enkel de laatste 5 per plugin.
+
+Per plugin bevat de index de laatste build per plugin-API (de laatste API_VERSIONS versies).
+Een app laadt enkel builds met exact zijn eigen plugin-API: zo houdt een oudere app zijn laatste
+passende build, en ziet hij aan de nieuwere entries dat een app-update verplicht is.
+Bovenaan staat "apiVersion" = de hoogste plugin-API in de index.
 """
 import argparse
 import base64
@@ -28,6 +33,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 
 KEEP = 5
+API_VERSIONS = 3
 
 
 def read_properties(path: pathlib.Path) -> dict:
@@ -70,10 +76,10 @@ def main() -> None:
     plugins_dir = args.dist / "plugins"
     index_path = plugins_dir / "index.json"
     index = json.loads(index_path.read_text()) if index_path.exists() else {"plugins": []}
-    entries = {p["id"]: p for p in index["plugins"]}
+    entries = {(p["id"], p["apiVersion"]): p for p in index["plugins"]}
 
-    existing = entries.get(pid)
-    if existing and existing["sha256"] == sha and existing["apiVersion"] == args.api_version:
+    existing = entries.get((pid, args.api_version))
+    if existing and existing["sha256"] == sha:
         print(f"{pid}: ongewijzigd (sha {sha[:12]}), niets te publiceren")
         return
 
@@ -83,7 +89,7 @@ def main() -> None:
     shutil.copyfile(args.dex, target)
 
     today = dt.datetime.now(dt.timezone.utc).strftime("%Y.%m.%d")
-    entries[pid] = {
+    entries[(pid, args.api_version)] = {
         "id": pid,
         "name": props.get("name", pid),
         "build": args.build,
@@ -94,14 +100,22 @@ def main() -> None:
         "sha256": sha,
     }
 
-    # Oude builds opruimen (laatste KEEP bewaren voor rollback).
+    # Enkel de laatste API_VERSIONS plugin-API's per plugin in de index houden.
+    apis = sorted((api for (i, api) in entries if i == pid), reverse=True)
+    for api in apis[API_VERSIONS:]:
+        del entries[(pid, api)]
+
+    # Oude builds opruimen (laatste KEEP bewaren voor rollback); jars uit de index blijven altijd staan.
+    referenced = {e["file"] for e in entries.values()}
     jars = sorted(target.parent.glob(f"{pid}-*.jar"), key=lambda p: int(p.stem.rsplit("-", 1)[1]))
     for old in jars[:-KEEP]:
-        old.unlink()
+        if f"plugins/{pid}/{old.name}" not in referenced:
+            old.unlink()
 
     index = {
         "generatedAt": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
-        "plugins": sorted(entries.values(), key=lambda p: p["id"]),
+        "apiVersion": max(e["apiVersion"] for e in entries.values()),
+        "plugins": sorted(entries.values(), key=lambda p: (p["id"], p["apiVersion"])),
     }
     raw = json.dumps(index, indent=2, ensure_ascii=False).encode()
     index_path.write_bytes(raw)

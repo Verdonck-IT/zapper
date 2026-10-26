@@ -76,6 +76,7 @@ fun HomeScreen(onOpen: (ItemEntity) -> Unit, onNavigate: (SidebarDestination) ->
     var sidebarOpen by remember { mutableStateOf(false) }
     var menuFor by remember { mutableStateOf<Tile?>(null) }
     val message by vm.message.collectAsStateWithLifecycle()
+    val compat by context.graph.plugins.compatibility.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
     val scope = rememberCoroutineScope()
 
@@ -136,6 +137,18 @@ fun HomeScreen(onOpen: (ItemEntity) -> Unit, onNavigate: (SidebarDestination) ->
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text("ZAPPER", style = MaterialTheme.typography.headlineSmall, color = ZapperColors.Accent)
+                if (compat?.updateRequired == true) {
+                    // Verplichte app-update: plugins vragen een nieuwere plugin-API (details en knop in Instellingen).
+                    Text(
+                        "⚠  App-update verplicht · zie Instellingen",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Color.Black,
+                        modifier = Modifier
+                            .padding(start = 20.dp)
+                            .background(ZapperColors.Warning, RoundedCornerShape(50))
+                            .padding(horizontal = 14.dp, vertical = 6.dp),
+                    )
+                }
                 Spacer(Modifier.weight(1f))
                 Text("◀  menu", style = MaterialTheme.typography.labelMedium, color = ZapperColors.TextSecondary)
             }

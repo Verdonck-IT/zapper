@@ -28,14 +28,15 @@ class MaintenanceWorker(context: Context, params: WorkerParameters) : CoroutineW
         val graph = applicationContext.graph
         val prefs = applicationContext.getSharedPreferences("sync", Context.MODE_PRIVATE)
 
-        if (inputData.getBoolean(KEY_ONLY_IF_STALE, false)) {
+        // Worker kan in een vers proces starten, vóór de app zelf de plugins laadde.
+        if (graph.plugins.plugins.value.isEmpty()) graph.plugins.loadInstalled()
+
+        // Na een app-update met een nieuwe plugin-API laden de oude builds niet meer: dan meteen updaten.
+        if (inputData.getBoolean(KEY_ONLY_IF_STALE, false) && !graph.plugins.hasUnloadedPlugins) {
             val last = prefs.getLong("lastSync", 0)
             val fresh = System.currentTimeMillis() - last < TimeUnit.HOURS.toMillis(12)
             if (fresh && graph.dao.count() > 0) return Result.success()
         }
-
-        // Worker kan in een vers proces starten, vóór de app zelf de plugins laadde.
-        if (graph.plugins.plugins.value.isEmpty()) graph.plugins.loadInstalled()
 
         runCatching { graph.plugins.checkForUpdates() }
             .onSuccess { outcomes -> outcomes.forEach { Log.i(TAG, describe(it)) } }

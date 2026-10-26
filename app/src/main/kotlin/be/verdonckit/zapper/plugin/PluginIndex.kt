@@ -10,6 +10,7 @@ import java.security.spec.X509EncodedKeySpec
 /**
  * index.json zoals CI hem publiceert (zie tools/publish/publish_plugin.py).
  * Het hele bestand is gesigneerd (index.json.sig), de jars zelf via hun sha256 in de index.
+ * Een zender kan meerdere entries hebben: de laatste build per plugin-API.
  */
 data class PluginEntry(
     val id: String,
@@ -21,6 +22,50 @@ data class PluginEntry(
     val file: String,
     val sha256: String,
 )
+
+/**
+ * Wat de index betekent voor deze app (de "shell"). De app laadt enkel plugins met exact
+ * dezelfde plugin-API ([be.verdonckit.zapper.api.PROVIDER_API_VERSION]); de index bevat per
+ * zender de laatste build per API-versie, zodat oudere apps hun laatste passende build houden.
+ */
+data class Compatibility(
+    /** Plugin-API van deze app. */
+    val appApi: Int,
+    /** Hoogste plugin-API die de nieuwste builds vragen, als die hoger is dan [appApi]: app-update verplicht. */
+    val requiredApi: Int?,
+    /** Zenders waarvan de nieuwste build een nieuwere app vraagt. */
+    val needsNewerApp: List<String>,
+    /** Zenders zonder enige build voor deze app (de app is nieuwer dan de gepubliceerde plugins). */
+    val awaitingPlugins: List<String>,
+    val checkedAt: Long,
+) {
+    val updateRequired: Boolean get() = requiredApi != null
+}
+
+object PluginCompat {
+    /** Per zender de nieuwste build die deze app kan laden. */
+    fun installable(entries: List<PluginEntry>, appApi: Int): List<PluginEntry> =
+        entries.filter { it.apiVersion == appApi }.groupBy { it.id }.map { (_, builds) -> builds.maxBy { it.build } }
+
+    fun evaluate(entries: List<PluginEntry>, appApi: Int, now: Long): Compatibility {
+        val needsNewer = mutableListOf<PluginEntry>()
+        val awaiting = mutableListOf<PluginEntry>()
+        entries.groupBy { it.id }.forEach { (_, builds) ->
+            val newest = builds.maxBy { it.build }
+            when {
+                newest.apiVersion > appApi -> needsNewer += newest
+                builds.none { it.apiVersion == appApi } -> awaiting += newest
+            }
+        }
+        return Compatibility(
+            appApi = appApi,
+            requiredApi = needsNewer.maxOfOrNull { it.apiVersion },
+            needsNewerApp = needsNewer.map { it.name }.sorted(),
+            awaitingPlugins = awaiting.map { it.name }.sorted(),
+            checkedAt = now,
+        )
+    }
+}
 
 object PluginIndex {
     fun parse(json: String): List<PluginEntry> {

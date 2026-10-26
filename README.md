@@ -65,6 +65,11 @@ adb install app-release.apk
 
 Sta daarna *onbekende bronnen* toe voor Zapper zelf; zo kan de app zichzelf bijwerken.
 
+Zenders worden apart van de app bijgewerkt. Vraagt een nieuwe versie van een zender een nieuwere app,
+dan staat er bovenaan het startscherm **App-update verplicht**; in Instellingen zie je welke zenders
+het vragen en installeer je de nieuwe versie met één knop. Tot dan blijven die zenders op hun laatste
+werkende versie.
+
 ### Eerste keer
 
 1. Open Zapper, druk ◀ en kies **Instellingen**.

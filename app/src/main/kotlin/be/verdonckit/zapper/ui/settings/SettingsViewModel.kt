@@ -9,7 +9,9 @@ import be.verdonckit.zapper.api.ErrorKind
 import be.verdonckit.zapper.api.LoginMethod
 import be.verdonckit.zapper.api.LoginResult
 import be.verdonckit.zapper.api.ProviderException
+import be.verdonckit.zapper.plugin.Compatibility
 import be.verdonckit.zapper.plugin.UpdateOutcome
+import be.verdonckit.zapper.update.AppUpdater
 import be.verdonckit.zapper.sync.MaintenanceWorker
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -40,6 +42,12 @@ data class SettingsState(
     val busy: Boolean = false,
     /** Lopende login met code: toon de code tot ze bevestigd is. */
     val deviceLogin: DeviceLoginUi? = null,
+    /** Oordeel over de plugin-index: verplichte app-update of wachten op plugins. */
+    val compatibility: Compatibility? = null,
+    /** Gepubliceerde app-versie die de gevraagde plugin-API heeft (enkel gezocht bij een verplichte update). */
+    val appUpdate: AppUpdater.Available? = null,
+    /** Er is een app-versie gepubliceerd, maar ze heeft de gevraagde plugin-API nog niet. */
+    val appUpdateTooOld: Boolean = false,
 )
 
 data class DeviceLoginUi(
@@ -54,7 +62,24 @@ class SettingsViewModel(private val app: Application, private val graph: AppGrap
     private val _state = MutableStateFlow(SettingsState())
     val state: StateFlow<SettingsState> = _state.asStateFlow()
 
-    init { refresh() }
+    init {
+        refresh()
+        viewModelScope.launch {
+            graph.plugins.compatibility.collect { compat ->
+                _state.update { it.copy(compatibility = compat) }
+                if (compat?.updateRequired == true) findAppUpdate(compat)
+            }
+        }
+    }
+
+    /** Is er al een app-versie met de plugin-API die de plugins vragen? */
+    private suspend fun findAppUpdate(compat: Compatibility) {
+        val required = compat.requiredApi ?: return
+        val available = runCatching { graph.appUpdater.check() }.getOrNull()
+        // Zonder providerApiVersion (oudere app.json) gaan we ervan uit dat een nieuwere APK past.
+        val fits = available != null && (available.providerApiVersion ?: required) >= required
+        _state.update { it.copy(appUpdate = available?.takeIf { fits }, appUpdateTooOld = available != null && !fits) }
+    }
 
     fun refresh() = viewModelScope.launch {
         val statuses = graph.plugins.plugins.value.values.map { p ->

@@ -16,6 +16,7 @@ object ZapperColors {
     val TextPrimary = Color(0xFFFFFFFF)
     val TextSecondary = Color(0xFFB3B3B3)
     val Success = Color(0xFF46D369)
+    val Warning = Color(0xFFF5A623)
 }
 
 private val colors = darkColorScheme(

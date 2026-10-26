@@ -73,6 +73,12 @@ Klaar:
   PUT/DELETE /userData/playerPosition/{id}, gevonden via vtmgo.be (web: /api/player/position) en live getest
   (positie terug gelezen, verwijderen + herstellen). NIET getest: licentie/afspelen op toestel, Mijn lijst schrijven.
   Referentie: fork frankdpGH/plugin.video.vtm.go (API 28).
+- Compatibiliteit app ↔ plugins (26/10/2026): index.json houdt de laatste build per (zender, plugin-API);
+  app (`PluginCompat`) toont "App-update verplicht" (startscherm + Instellingen met installeerknop) als de nieuwste
+  build een hogere API vraagt; `app.json.providerApiVersion`; builds voor een andere API worden niet geladen.
+  Workflows lezen PROVIDER_API_VERSION uit provider-api. App heeft nu unit tests (`app/src/test`, JUnit 5).
+  Op emulator getest met een nagebootst oordeel (prefs); publish_plugin.py lokaal getest (v4-build blijft naast v5).
+  Let op: de app die nu op de TV staat (API 4) heeft dit nog niet; de melding werkt vanaf de volgende app-release.
 - VRT-genres (26/10/2026): de oude zoeklijst-id's ("o%14|…|watch%") geven `list: null`; vrt.be/vrtmax/categorieen/ verwijst
   nu naar /zoeken/. Catalogus per genre/type via GraphQL `pageSearch(input: {facets, mediaType: video})` → tabblad met
   `tileContentType` "program", bladeren met `after` in dezelfde query. Kodi-add-on had nog geen fix (laatste commit 30/08/2026).

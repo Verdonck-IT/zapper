@@ -21,6 +21,8 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.json.JSONArray
+import org.json.JSONObject
 import java.io.File
 
 data class LoadedPlugin(
@@ -59,6 +61,15 @@ class PluginManager(
     private val _plugins = MutableStateFlow<Map<String, LoadedPlugin>>(emptyMap())
     val plugins: StateFlow<Map<String, LoadedPlugin>> = _plugins.asStateFlow()
 
+    private val _compatibility = MutableStateFlow(loadCompatibility())
+
+    /** Laatste beoordeling van de plugin-index voor deze app; null = nog nooit gecontroleerd. */
+    val compatibility: StateFlow<Compatibility?> = _compatibility.asStateFlow()
+
+    /** Geïnstalleerde zenders die niet geladen konden worden (andere plugin-API): update-check nodig. */
+    @Volatile var hasUnloadedPlugins: Boolean = false
+        private set
+
     fun get(id: String): LoadedPlugin? = _plugins.value[id]
 
     // ---------- Opstarten ----------
@@ -70,14 +81,20 @@ class PluginManager(
             installedIds().forEach { id ->
                 val current = prefs.getInt("current.$id", -1)
                 val previous = prefs.getInt("previous.$id", -1)
-                val plugin = runCatching { loadBuild(id, current) }.getOrNull()
-                    ?: runCatching { loadBuild(id, previous) }.getOrNull()?.also {
-                        Log.w(TAG, "$id: build $current laadt niet, terug naar $previous")
-                        markBad(id, current)
-                        prefs.edit().putInt("current.$id", previous).apply()
+                // Een build voor een andere plugin-API (bv. na een app-update) nooit laden: wacht op een passende build.
+                val currentFits = fitsThisApp(id, current)
+                val plugin = (if (currentFits) runCatching { loadBuild(id, current) }.getOrNull() else null)
+                    ?: (if (fitsThisApp(id, previous)) runCatching { loadBuild(id, previous) }.getOrNull() else null)?.also {
+                        if (currentFits) {
+                            Log.w(TAG, "$id: build $current laadt niet, terug naar $previous")
+                            markBad(id, current)
+                            prefs.edit().putInt("current.$id", previous).apply()
+                        }
                     }
+                if (plugin == null && !currentFits) Log.i(TAG, "$id: build $current is voor plugin-API ${apiOf(id, current)}, deze app heeft $PROVIDER_API_VERSION")
                 plugin?.let { loaded[id] = it }
             }
+            hasUnloadedPlugins = installedIds().any { it !in loaded }
 
             // Debug: plugins rechtstreeks van het classpath hebben voorrang.
             BuildConfig.DEV_PLUGINS.split(',').map { it.trim() }.filter { it.isNotEmpty() }.forEach { cls ->
@@ -103,11 +120,39 @@ class PluginManager(
                 "handtekening van plugin-index ongeldig: update geweigerd"
             }
 
-            PluginIndex.parse(indexBytes.toString(Charsets.UTF_8))
-                .filter { it.apiVersion == PROVIDER_API_VERSION }
+            val entries = PluginIndex.parse(indexBytes.toString(Charsets.UTF_8))
+            saveCompatibility(PluginCompat.evaluate(entries, PROVIDER_API_VERSION, System.currentTimeMillis()))
+            PluginCompat.installable(entries, PROVIDER_API_VERSION)
                 .mapNotNull { entry -> runCatching { install(entry, site) }.getOrElse { UpdateOutcome.Failed(entry.id, it.message ?: it.toString()) } }
+                .also { hasUnloadedPlugins = installedIds().any { it !in _plugins.value } }
         }
     }
+
+    // ---------- Compatibiliteit ----------
+
+    private fun saveCompatibility(c: Compatibility) {
+        val json = JSONObject()
+            .put("appApi", c.appApi)
+            .put("requiredApi", c.requiredApi ?: JSONObject.NULL)
+            .put("needsNewerApp", JSONArray(c.needsNewerApp))
+            .put("awaitingPlugins", JSONArray(c.awaitingPlugins))
+            .put("checkedAt", c.checkedAt)
+        prefs.edit().putString("compatibility", json.toString()).apply()
+        _compatibility.value = c
+    }
+
+    /** Bewaard oordeel; telt enkel als het voor deze app-versie (zelfde plugin-API) gemaakt is. */
+    private fun loadCompatibility(): Compatibility? = runCatching {
+        val o = JSONObject(prefs.getString("compatibility", null) ?: return null)
+        fun list(key: String) = o.optJSONArray(key)?.let { a -> (0 until a.length()).map { a.getString(it) } }.orEmpty()
+        Compatibility(
+            appApi = o.getInt("appApi"),
+            requiredApi = if (o.isNull("requiredApi")) null else o.getInt("requiredApi"),
+            needsNewerApp = list("needsNewerApp"),
+            awaitingPlugins = list("awaitingPlugins"),
+            checkedAt = o.optLong("checkedAt"),
+        ).takeIf { it.appApi == PROVIDER_API_VERSION }
+    }.getOrNull()
 
     /** [site] = root van de dist-site; `entry.file` is daar relatief aan ("plugins/<id>/<id>-<build>.jar"), net als de APK in app.json. */
     private suspend fun install(entry: PluginEntry, site: String): UpdateOutcome? {
@@ -127,6 +172,7 @@ class PluginManager(
         target.setReadOnly() // Android 14+ weigert anders dynamisch geladen code
 
         prefs.edit().putString("entry.${entry.id}.${entry.build}", entry.entryClass)
+            .putInt("api.${entry.id}.${entry.build}", entry.apiVersion)
             .putString("name.${entry.id}", entry.name)
             .putString("version.${entry.id}.${entry.build}", entry.version)
             .apply()
@@ -138,7 +184,8 @@ class PluginManager(
 
         val health = selfTest(candidate)
         saveHealth(health)
-        if (!health.ok && current != -1) {
+        // Terugrollen kan enkel naar een build die deze app kan laden; anders liever deze dan niets.
+        if (!health.ok && fitsThisApp(entry.id, current)) {
             markBad(entry.id, entry.build)
             target.setWritable(true); target.delete()
             return UpdateOutcome.RolledBack(entry.id, entry.version, "${health.firstFailure?.name}: ${health.firstFailure?.detail}")
@@ -219,6 +266,11 @@ class PluginManager(
         prefs.all.keys.filter { it.startsWith("current.") }.map { it.removePrefix("current.") }.toSet()
 
     private fun jarFile(id: String, build: Int) = File(dir, "$id/$build.jar")
+
+    /** Plugin-API van een geïnstalleerde build; -1 = geïnstalleerd vóór dit bijgehouden werd (plugin-API ≤ 4). */
+    private fun apiOf(id: String, build: Int) = prefs.getInt("api.$id.$build", -1)
+
+    private fun fitsThisApp(id: String, build: Int) = build >= 0 && apiOf(id, build) == PROVIDER_API_VERSION
 
     private fun isBad(id: String, build: Int) = prefs.getStringSet("bad.$id", emptySet())!!.contains(build.toString())
 

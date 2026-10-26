@@ -50,6 +50,8 @@ import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import be.verdonckit.zapper.api.LoginMethod
 import be.verdonckit.zapper.graph
+import be.verdonckit.zapper.plugin.Compatibility
+import be.verdonckit.zapper.update.AppUpdater
 import kotlinx.coroutines.delay
 import be.verdonckit.zapper.ui.theme.ZapperColors
 
@@ -64,6 +66,10 @@ fun SettingsScreen(onBack: () -> Unit) {
     val listState = rememberLazyListState()
     val firstButton = remember { FocusRequester() }
     var firstFocused by remember { mutableStateOf(false) }
+    // Verplichte app-update met een installeerbare versie: die knop krijgt de eerste focus.
+    val compat = state.compatibility
+    val installFirst = compat?.updateRequired == true && state.appUpdate != null
+    val firstModifier = Modifier.focusRequester(firstButton).onFocusChanged { firstFocused = it.isFocused }
 
     // Terug: eerst naar boven (eerste knop), dan pas naar het startscherm.
     BackToTop(
@@ -84,12 +90,24 @@ fun SettingsScreen(onBack: () -> Unit) {
         item {
             Text("Instellingen", style = MaterialTheme.typography.displaySmall, color = Color.White)
         }
+        if (compat != null && (compat.updateRequired || compat.awaitingPlugins.isNotEmpty())) {
+            item {
+                CompatibilityNotice(
+                    compat = compat,
+                    appUpdate = state.appUpdate,
+                    appUpdateTooOld = state.appUpdateTooOld,
+                    busy = state.busy,
+                    onInstall = vm::checkAppUpdate,
+                    buttonModifier = if (installFirst) firstModifier else Modifier,
+                )
+            }
+        }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(
                     onClick = vm::syncNow,
                     enabled = !state.busy,
-                    modifier = Modifier.focusRequester(firstButton).onFocusChanged { firstFocused = it.isFocused },
+                    modifier = if (installFirst) Modifier else firstModifier,
                 ) { Text("Catalogus nu syncen") }
                 OutlinedButton(onClick = vm::updatePlugins, enabled = !state.busy) { Text("Plugins bijwerken") }
                 OutlinedButton(onClick = vm::checkAppUpdate, enabled = !state.busy) { Text("App-update zoeken") }
@@ -186,6 +204,64 @@ private fun ProviderCard(
 
         if (showLogin) LoginForm(initialUser = status.username.orEmpty(), onSubmit = onLogin)
         deviceLogin?.let { DeviceLoginPanel(it, onCancelDeviceLogin) }
+    }
+}
+
+/**
+ * Verplichte app-update (plugins vragen een nieuwere plugin-API) of plugins die nog niet gepubliceerd
+ * zijn voor deze app-versie. Met een installeerbare versie: knop om meteen bij te werken.
+ */
+@Composable
+private fun CompatibilityNotice(
+    compat: Compatibility,
+    appUpdate: AppUpdater.Available?,
+    appUpdateTooOld: Boolean,
+    busy: Boolean,
+    onInstall: () -> Unit,
+    buttonModifier: Modifier,
+) {
+    val color = if (compat.updateRequired) ZapperColors.Warning else ZapperColors.TextSecondary
+    Column(
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(ZapperColors.Surface, RoundedCornerShape(6.dp))
+            .border(BorderStroke(2.dp, color), RoundedCornerShape(6.dp))
+            .padding(20.dp),
+    ) {
+        if (compat.updateRequired) {
+            Text("⚠  App-update verplicht", style = MaterialTheme.typography.headlineSmall, color = color)
+            Text(
+                "${compat.needsNewerApp.joinToString()} ${if (compat.needsNewerApp.size == 1) "vraagt" else "vragen"} een nieuwere " +
+                    "versie van Zapper (plugin-API ${compat.requiredApi}, deze app heeft ${compat.appApi}). " +
+                    "Tot je de app bijwerkt, krijgen die zenders geen updates of fixes meer.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = Color.White,
+            )
+            when {
+                appUpdate != null -> Button(onClick = onInstall, enabled = !busy, modifier = buttonModifier) {
+                    Text("Zapper ${appUpdate.versionName} installeren")
+                }
+                appUpdateTooOld -> Text(
+                    "De nieuwste gepubliceerde app-versie ondersteunt plugin-API ${compat.requiredApi} nog niet. Probeer later opnieuw.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = ZapperColors.TextSecondary,
+                )
+                else -> Text(
+                    "Nog geen nieuwere app-versie gevonden. Kies later 'App-update zoeken'.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = ZapperColors.TextSecondary,
+                )
+            }
+        }
+        if (compat.awaitingPlugins.isNotEmpty()) {
+            Text(
+                "Nog geen plugin voor deze app-versie: ${compat.awaitingPlugins.joinToString()}. " +
+                    "Ze verschijnen zodra ze gepubliceerd zijn.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = ZapperColors.TextSecondary,
+            )
+        }
     }
 }
 

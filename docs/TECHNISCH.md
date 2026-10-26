@@ -45,7 +45,20 @@ Fouten gaan via `ProviderException` met een `ErrorKind`; `API_CHANGED` betekent 
 gewijzigd is en is het signaal voor de health-check.
 
 Elke breaking change verhoogt `PROVIDER_API_VERSION` (nu **5**) en vraagt een app-release; de app
-laadt enkel plugins met exact dezelfde versie. Optionele mogelijkheden staan als vlag in `ProviderInfo`:
+laadt enkel plugins met exact dezelfde versie.
+
+**Compatibiliteit app ↔ plugins.** De workflows lezen `PROVIDER_API_VERSION` uit provider-api (geen tweede
+kopie). `plugins/index.json` bevat per zender de laatste build *per plugin-API* (laatste 3 API's) en bovenaan
+`apiVersion`; jars waar de index naar verwijst worden nooit opgeruimd. Zo houdt een oudere app zijn laatste
+passende build. De app beoordeelt de index bij elke update-check (`PluginCompat.evaluate`, bewaard in de
+prefs): vraagt de nieuwste build van een zender een hogere plugin-API, dan is een **app-update verplicht**
+(gele melding op het startscherm, uitleg + installeerknop bovenaan Instellingen). `app/app.json` heeft
+`providerApiVersion`, zodat de app weet of de gepubliceerde APK die API al heeft. Een zender zonder build
+voor deze app (app nieuwer dan de plugins) staat als "nog geen plugin" in Instellingen. Geïnstalleerde
+builds onthouden hun plugin-API (`api.<id>.<build>`); een build voor een andere API wordt niet geladen
+(builds van vóór dit bijhouden gelden als ≤ 4), en dan doet de onderhoudsjob meteen een update-check.
+
+Optionele mogelijkheden staan als vlag in `ProviderInfo`:
 
 | Vlag | Methodes | VRT MAX | Play | Focus & WTV |
 |---|---|---|---|---|

@@ -17,13 +17,20 @@ import org.json.JSONObject
 
 /**
  * Self-update voor de gesideloade APK. CI publiceert app/app.json:
- *   {"versionCode": 42, "versionName": "0.1.42", "apk": "app/zapper-42.apk", "sha256": "..."}
+ *   {"versionCode": 42, "versionName": "0.1.42", "apk": "app/zapper-42.apk", "sha256": "...", "providerApiVersion": 5}
+ * `providerApiVersion` = plugin-API van die APK (ontbreekt bij oudere publicaties).
  * Integriteit: sha256 hier + Android zelf weigert een APK met een andere signeersleutel.
  * De gebruiker moet "onbekende bronnen" toestaan voor Zapper (eenmalig).
  */
 class AppUpdater(private val context: Context, private val client: OkHttpClient) {
 
-    data class Available(val versionCode: Int, val versionName: String, val apkPath: String, val sha256: String)
+    data class Available(
+        val versionCode: Int,
+        val versionName: String,
+        val apkPath: String,
+        val sha256: String,
+        val providerApiVersion: Int?,
+    )
 
     suspend fun check(): Available? = withContext(Dispatchers.IO) {
         val json = JSONObject(get("app/app.json").toString(Charsets.UTF_8))
@@ -32,6 +39,7 @@ class AppUpdater(private val context: Context, private val client: OkHttpClient)
             versionName = json.getString("versionName"),
             apkPath = json.getString("apk"),
             sha256 = json.getString("sha256").lowercase(),
+            providerApiVersion = json.optInt("providerApiVersion", 0).takeIf { it > 0 },
         )
         available.takeIf { it.versionCode > BuildConfig.VERSION_CODE }
     }

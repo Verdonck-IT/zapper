@@ -10,9 +10,6 @@ on:
 
 concurrency: publish-dist
 
-env:
-  PROVIDER_API_VERSION: 5 # moet gelijk zijn aan PROVIDER_API_VERSION in provider-api
-
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -23,6 +20,12 @@ jobs:
       HAS_SIGNING_KEY: ${{ secrets.PLUGIN_SIGNING_KEY != '' }}
     steps:
       - uses: actions/checkout@v4
+      - name: Plugin-API uit provider-api lezen
+        run: |
+          v=$(sed -nE 's/^const val PROVIDER_API_VERSION = ([0-9]+).*/\1/p' provider-api/src/main/kotlin/be/verdonckit/zapper/api/StreamingProvider.kt)
+          [ -n "$v" ] || { echo "::error::PROVIDER_API_VERSION niet gevonden in provider-api"; exit 1; }
+          echo "PROVIDER_API_VERSION=$v" >> "$GITHUB_ENV"
+          echo "Plugin-API $v"
 
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 17 }

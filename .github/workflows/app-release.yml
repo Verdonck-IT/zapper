@@ -37,6 +37,13 @@ jobs:
             exit 1
           fi
 
+      - name: Plugin-API uit provider-api lezen
+        run: |
+          v=$(sed -nE 's/^const val PROVIDER_API_VERSION = ([0-9]+).*/\1/p' provider-api/src/main/kotlin/be/verdonckit/zapper/api/StreamingProvider.kt)
+          [ -n "$v" ] || { echo "::error::PROVIDER_API_VERSION niet gevonden in provider-api"; exit 1; }
+          echo "PROVIDER_API_VERSION=$v" >> "$GITHUB_ENV"
+          echo "Plugin-API $v"
+
       - name: Versie bepalen
         id: version
         run: |
@@ -76,6 +83,7 @@ jobs:
             --apk app/build/outputs/apk/release/app-release.apk \
             --version-code ${{ github.run_number }} \
             --version-name ${{ steps.version.outputs.name }} \
+            --provider-api-version "$PROVIDER_API_VERSION" \
             --dist dist
           cd dist
           git config user.name "zapper-ci"

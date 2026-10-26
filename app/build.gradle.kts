@@ -71,6 +71,9 @@ android {
         // Elke dev-plugin draagt een eigen manifest; enkel CI (plugins.yml) leest het, uit de bronmap.
         resources.excludes += "zapper-plugin.properties"
     }
+    testOptions {
+        unitTests.all { it.useJUnitPlatform() }
+    }
 }
 
 ksp {
@@ -110,4 +113,6 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.coil.compose)
     implementation(libs.coil.network.okhttp)
+
+    testImplementation(libs.junit.jupiter)
 }
