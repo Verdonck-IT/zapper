@@ -14,6 +14,7 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest as JRequest
 import java.net.http.HttpResponse as JResponse
 import java.time.Duration
+import java.util.zip.GZIPInputStream
 
 /**
  * Host voor plugins op een gewone JVM: voor contracttests en lokaal debuggen.
@@ -45,10 +46,13 @@ class JvmHostServices(
             val publisher = body?.let { JRequest.BodyPublishers.ofByteArray(it) } ?: JRequest.BodyPublishers.noBody()
             builder.method(method, publisher)
             val r = client.send(builder.build(), JResponse.BodyHandlers.ofByteArray())
+            val respHeaders = r.headers().map().mapKeys { it.key.lowercase() }
+            // Zoals OkHttp in de app: gzip transparant uitpakken (login.vtm.be stuurt gzip, ook ongevraagd).
+            val gzipped = respHeaders["content-encoding"]?.any { it.equals("gzip", ignoreCase = true) } == true
             HttpResponse(
                 code = r.statusCode(),
-                headers = r.headers().map().mapKeys { it.key.lowercase() },
-                body = r.body(),
+                headers = if (gzipped) respHeaders - "content-encoding" - "content-length" else respHeaders,
+                body = if (gzipped && r.body().isNotEmpty()) GZIPInputStream(r.body().inputStream()).use { it.readBytes() } else r.body(),
                 finalUrl = url,
             )
         }

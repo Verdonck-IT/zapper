@@ -34,6 +34,9 @@ data class SelfTestResult(val providerId: String, val steps: List<SelfTestStep>)
  */
 object ProviderSelfTest {
 
+    /** Zoveel seizoenen probeert de details-stap hoogstens voor een beschikbare aflevering. */
+    private const val MAX_SEASONS = 5
+
     suspend fun run(provider: StreamingProvider, http: HostHttp, playStream: Boolean = true): SelfTestResult {
         val steps = mutableListOf<SelfTestStep>()
         suspend fun <T> step(name: String, block: suspend () -> Pair<T, String>): T? = try {
@@ -74,9 +77,12 @@ object ProviderSelfTest {
             target.playableId?.let { return@step it to "direct afspeelbaar: ${target.title}" }
             val details = provider.details(target.id)
             check(details.seasons.isNotEmpty()) { "geen seizoenen voor ${target.title}" }
-            val season = details.seasons.first()
-            val eps = season.episodesPreview.ifEmpty { provider.episodes(season.id, null).items }
-            val ep = eps.firstOrNull { it.available } ?: error("geen beschikbare aflevering in '${season.title}'")
+            // Oudere seizoenen kunnen achter een betaalmuur zitten (bv. VTM GO+): het eerste seizoen met een
+            // beschikbare aflevering, te beginnen bij de seizoenen waarvan de afleveringen al meekwamen.
+            val ordered = details.seasons.sortedBy { it.episodesPreview.isEmpty() }.take(MAX_SEASONS)
+            val ep = ordered.firstNotNullOfOrNull { season ->
+                season.episodesPreview.ifEmpty { provider.episodes(season.id, null).items }.firstOrNull { it.available }
+            } ?: error("geen beschikbare aflevering in ${ordered.joinToString { "'${it.title}'" }}")
             ep.playableId to "${target.title}: ${details.seasons.size} seizoen(en), test '${ep.title}'"
         } ?: return SelfTestResult(id, steps)
 

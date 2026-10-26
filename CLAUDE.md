@@ -65,8 +65,11 @@ Klaar:
 - VTM GO-plugin (`plugins/vtmgo`, 26/10/2026): provider-api v5 (`LoginMethod.DEVICE_CODE`, `startDeviceLogin()`,
   `pollDeviceLogin()`); Instellingen toont code + login.vtm.be/androidtv en pollt. Catalogus uit de storefronts
   (main/series/films/docu/kids) met `thema-*` uit rijtitels, details/seizoenen via `detail3`, live, Mijn lijst, streams via
-  `play-config` + DRMtoday (`acquireLicense`). Publieke API live verkend (catalogus/live/detail3 werken zonder login);
-  login, streams, licentie en Mijn lijst NOG NIET live getest. Referentie: fork frankdpGH/plugin.video.vtm.go (API 28).
+  `play-config` + DRMtoday (`acquireLicense`). Live getest via de testkit (26/10/2026): login met code, refresh,
+  alle storefronts (series 755, films 2685, docu 474, kids 1253), 10 live-zenders, Mijn lijst lezen, streams (DASH + Widevine)
+  en manifest. Oudere seizoenen zijn vaak VTM GO+ (UPSELL → niet beschikbaar). NIET getest: licentie/afspelen op toestel,
+  Mijn lijst schrijven. login.vtm.be stuurt altijd gzip (testkit pakt nu uit zoals OkHttp).
+  Referentie: fork frankdpGH/plugin.video.vtm.go (API 28).
 - VRT-genres (26/10/2026): de oude zoeklijst-id's ("o%14|…|watch%") geven `list: null`; vrt.be/vrtmax/categorieen/ verwijst
   nu naar /zoeken/. Catalogus per genre/type via GraphQL `pageSearch(input: {facets, mediaType: video})` → tabblad met
   `tileContentType` "program", bladeren met `after` in dezelfde query. Kodi-add-on had nog geen fix (laatste commit 30/08/2026).
