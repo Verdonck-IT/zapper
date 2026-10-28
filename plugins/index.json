@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-26T19:37:00+00:00",
+  "generatedAt": "2026-10-28T22:17:27+00:00",
   "apiVersion": 5,
   "plugins": [
     {
@@ -35,12 +35,12 @@
     {
       "id": "play",
       "name": "Play",
-      "build": 9,
-      "version": "2026.10.26.9",
+      "build": 10,
+      "version": "2026.10.28.10",
       "apiVersion": 5,
       "entryClass": "be.verdonckit.zapper.plugins.play.PlayProvider",
-      "file": "plugins/play/play-9.jar",
-      "sha256": "499d321922fa22e430846d6a12c80fcc1004406ad2f395337432025900e2f2cc"
+      "file": "plugins/play/play-10.jar",
+      "sha256": "d5a56ae5a385ac31851e4b11ddd8345063f5e49ce724835f7f598b431d2dd086"
     },
     {
       "id": "vrtmax",
