@@ -201,9 +201,19 @@ class HomeViewModel(private val graph: AppGraph) : ViewModel() {
             else -> null
         }
 
+        /** Titel die enkel het nummer herhaalt ("S24-A14", "Aflevering 14") valt weg naast de code. */
+        private val CODE_ONLY_TITLE = Regex("""(?i)^\s*(?:s\d+\s*[-–.]?\s*)?(?:a|afl\.?|aflevering|e|ep)\s*(\d+)\s*$""")
+
+        fun isCodeOnly(title: String, episode: Int?): Boolean =
+            episode != null && CODE_ONLY_TITLE.find(title)?.groupValues?.get(1)?.toIntOrNull() == episode
+
+        /** "S24 A14 – Titel", zonder de titel als die enkel de code herhaalt. */
+        fun episodeLabel(season: Int?, episode: Int?, title: String): String =
+            listOfNotNull(episodeCode(season, episode), title.takeUnless { isCodeOnly(it, episode) }).joinToString(" – ")
+
         private fun episodeLine(season: Int?, episode: Int?, title: String, pos: Long, dur: Long): String =
             listOfNotNull(
-                listOfNotNull(episodeCode(season, episode), title).joinToString(" – "),
+                episodeLabel(season, episode, title),
                 if (pos > 0) remaining(pos, dur) else "Volgende aflevering",
             ).joinToString(" · ")
 

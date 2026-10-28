@@ -95,7 +95,7 @@ fun EpisodeScreen(itemKey: String, playableId: String, onGone: () -> Unit) {
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                listOfNotNull(HomeViewModel.episodeCode(episode.seasonNumber, episode.episodeNumber), episode.title).joinToString(" – "),
+                HomeViewModel.episodeLabel(episode.seasonNumber, episode.episodeNumber, episode.title),
                 style = MaterialTheme.typography.headlineSmall,
                 color = Color.White,
                 maxLines = 2,

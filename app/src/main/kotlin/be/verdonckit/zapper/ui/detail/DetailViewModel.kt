@@ -61,8 +61,13 @@ data class DetailState(
     val loading: Boolean = true,
     val error: String? = null,
 ) {
-    val episodes: List<Episode> get() = seasons.getOrNull(selectedSeason)?.episodes.orEmpty()
+    /** In kijkvolgorde (Play zet de nieuwste aflevering vooraan). */
+    val episodes: List<Episode> get() = inEpisodeOrder(seasons.getOrNull(selectedSeason)?.episodes.orEmpty())
 }
+
+/** Op afleveringsnummer als elke aflevering er een heeft, anders de volgorde van het platform. */
+fun inEpisodeOrder(eps: List<Episode>): List<Episode> =
+    if (eps.isNotEmpty() && eps.all { it.episodeNumber != null }) eps.sortedBy { it.episodeNumber } else eps
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DetailViewModel(private val graph: AppGraph, itemKey: String) : ViewModel() {
@@ -263,9 +268,7 @@ class DetailViewModel(private val graph: AppGraph, itemKey: String) : ViewModel(
         val seasonNumbers = seasons.mapIndexed { i, s -> i to (SEASON_NUMBER.find(s.label)?.groupValues?.get(1)?.toIntOrNull() ?: s.episodes.firstNotNullOfOrNull { it.seasonNumber }) }
         val sortedSeasons = if (seasonNumbers.all { it.second != null }) seasonNumbers.sortedBy { it.second } else seasonNumbers
         return sortedSeasons.flatMap { (i, _) ->
-            val eps = seasons[i].episodes
-            val sorted = if (eps.isNotEmpty() && eps.all { it.episodeNumber != null }) eps.sortedBy { it.episodeNumber } else eps
-            sorted.map { i to it }
+            inEpisodeOrder(seasons[i].episodes).map { i to it }
         }
     }
 

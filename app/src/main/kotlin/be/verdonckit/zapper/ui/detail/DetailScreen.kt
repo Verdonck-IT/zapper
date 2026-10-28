@@ -106,7 +106,7 @@ fun DetailScreen(itemKey: String, onOpenEpisode: (itemKey: String, episode: Epis
                     val w = state.watch[next.episode.playableId]
                     Text(
                         listOfNotNull(
-                            listOfNotNull(HomeViewModel.episodeCode(next.episode.seasonNumber, next.episode.episodeNumber), next.episode.title).joinToString(" – "),
+                            HomeViewModel.episodeLabel(next.episode.seasonNumber, next.episode.episodeNumber, next.episode.title),
                             w?.takeIf { it.inProgress }?.let { HomeViewModel.remaining(it.positionMs, it.durationMs) },
                         ).joinToString(" · "),
                         style = MaterialTheme.typography.bodyLarge,
@@ -193,7 +193,8 @@ private fun EpisodeCard(ep: Episode, state: DetailState, isNext: Boolean, brand:
     val w = state.watch[ep.playableId]
     Column(Modifier.width(260.dp)) {
         ContentCard(
-            title = listOfNotNull(ep.episodeNumber?.let { "$it." }, ep.title).joinToString(" "),
+            title = if (HomeViewModel.isCodeOnly(ep.title, ep.episodeNumber)) ep.title
+            else listOfNotNull(ep.episodeNumber?.let { "$it." }, ep.title).joinToString(" "),
             // Aflevering: eigen still → beeld van het programma → gegenereerde kaart
             imageUrls = listOf(ep.imageUrl, item?.backdropUrl, item?.posterUrl),
             brandColor = brand,
