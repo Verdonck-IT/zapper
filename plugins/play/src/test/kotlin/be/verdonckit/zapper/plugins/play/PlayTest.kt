@@ -79,4 +79,12 @@ class PlayUnitTest {
         assertEquals("https://images.play.tv/x.jpg", PlayProvider.image("https://images.play.tv/x.jpg"))
         assertEquals(3, PlayProvider.trailingNumber("Seizoen 3"))
     }
+
+    @Test
+    fun `afleveringsnummer uit de titel`() {
+        assertEquals(12, PlayProvider.episodeNumberFromTitle("S24-A12"))
+        assertEquals(3, PlayProvider.episodeNumberFromTitle("S2 - A3: De finale"))
+        assertEquals(5, PlayProvider.episodeNumberFromTitle("Aflevering 5"))
+        assertNull(PlayProvider.episodeNumberFromTitle("De finale"))
+    }
 }

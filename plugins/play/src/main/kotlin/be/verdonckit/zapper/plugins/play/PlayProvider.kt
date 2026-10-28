@@ -224,8 +224,7 @@ class PlayProvider : StreamingProvider {
             imageUrl = image(v.str("image")) ?: v.arr("images").objects().firstNotNullOfOrNull { image(it.str("url")) },
             durationSeconds = duration,
             seasonNumber = v.optInt("seasonNumber", 0).takeIf { it > 0 } ?: seasonTitle?.let(::trailingNumber),
-            episodeNumber = v.optInt("episodeNumber", 0).takeIf { it > 0 }
-                ?: EPISODE_IN_TITLE.find(title)?.groupValues?.get(1)?.toIntOrNull(),
+            episodeNumber = v.optInt("episodeNumber", 0).takeIf { it > 0 } ?: episodeNumberFromTitle(title),
             progress = watchProgress(position, duration),
         )
     }
@@ -395,6 +394,14 @@ class PlayProvider : StreamingProvider {
         /** Play geeft lege beelden soms als de tekst "None". */
         internal fun image(url: String?): String? =
             url?.takeIf { it.startsWith("http") && !it.equals("None", ignoreCase = true) }
+
+        /**
+         * "Aflevering 3" of "S24-A12": zonder nummer valt de app terug op de lijstvolgorde,
+         * en Play zet de nieuwste aflevering vooraan (dan wordt "volgende" een oudere).
+         */
+        internal fun episodeNumberFromTitle(title: String): Int? =
+            CODE_IN_SUBTITLE.find(title)?.groupValues?.get(2)?.toIntOrNull()
+                ?: EPISODE_IN_TITLE.find(title)?.groupValues?.get(1)?.toIntOrNull()
 
         internal fun trailingNumber(s: String): Int? = Regex("""(\d+)\s*$""").find(s)?.groupValues?.get(1)?.toIntOrNull()
 
