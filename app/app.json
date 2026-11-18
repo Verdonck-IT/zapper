@@ -1,7 +1,7 @@
 {
-  "versionCode": 5,
-  "versionName": "0.2.2",
-  "apk": "app/zapper-5.apk",
-  "sha256": "d89298286e82a5d3c1df48cf241fa8203e0e1697a32d2472206cf46fcdd6e671",
+  "versionCode": 6,
+  "versionName": "0.3.0",
+  "apk": "app/zapper-6.apk",
+  "sha256": "bc73e2ecea72d3f0e3cf35e60b4fd507bafe8db6c930d60c48f42670a09952bf",
   "providerApiVersion": 5
 }
