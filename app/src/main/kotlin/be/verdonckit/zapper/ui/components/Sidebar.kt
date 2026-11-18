@@ -64,7 +64,8 @@ fun Sidebar(
 
     AnimatedVisibility(open, enter = fadeIn(), exit = fadeOut()) {
         // Scrim: de inhoud blijft zichtbaar maar treedt terug.
-        Box(Modifier.fillMaxSize().background(Color(0x99000000)))
+        // Tik naast het menu (tablet) sluit het.
+        Box(Modifier.fillMaxSize().background(Color(0x99000000)).touchClickable(onClick = onClose))
     }
     AnimatedVisibility(
         open,
@@ -105,6 +106,7 @@ fun Sidebar(
                     scale = ClickableSurfaceDefaults.scale(focusedScale = 1.03f),
                     modifier = Modifier
                         .fillMaxWidth()
+                        .touchClickable { onSelect(dest) }
                         .focusRequester(requesters.getValue(dest))
                         // Focus niet uit het menu laten ontsnappen aan de boven- of onderkant.
                         .onPreviewKeyEvent { e ->

@@ -26,9 +26,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import androidx.tv.material3.Button
+import be.verdonckit.zapper.ui.components.Button
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.OutlinedButton
+import be.verdonckit.zapper.ui.components.OutlinedButton
 import androidx.tv.material3.Text
 import be.verdonckit.zapper.ui.components.requestFocusAfterLayout
 import be.verdonckit.zapper.ui.theme.ZapperColors

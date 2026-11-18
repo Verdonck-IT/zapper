@@ -31,6 +31,7 @@ import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -42,7 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.tv.material3.Button
+import be.verdonckit.zapper.ui.components.Button
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import be.verdonckit.zapper.data.ItemEntity
@@ -51,6 +52,8 @@ import be.verdonckit.zapper.player.PlayerActivity
 import be.verdonckit.zapper.ui.components.BackToTop
 import be.verdonckit.zapper.ui.components.TrackedFocusRequester
 import be.verdonckit.zapper.ui.components.focusRequester
+import be.verdonckit.zapper.ui.components.isTouchDevice
+import be.verdonckit.zapper.ui.components.touchClickable
 import be.verdonckit.zapper.ui.components.ContentCard
 import be.verdonckit.zapper.ui.components.DefaultScrollInside
 import be.verdonckit.zapper.ui.components.PivotToTop
@@ -79,6 +82,7 @@ fun HomeScreen(onOpen: (ItemEntity) -> Unit, onNavigate: (SidebarDestination) ->
     val compat by context.graph.plugins.compatibility.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
     val scope = rememberCoroutineScope()
+    val touch = isTouchDevice()
 
     // Per kaart een FocusRequester, zodat de focus na het sluiten van het menu terugkeert waar je was.
     // De eerste kaart bovenaan heeft [firstCard] en staat hier bewust niet in: "Verder kijken" kan
@@ -120,7 +124,29 @@ fun HomeScreen(onOpen: (ItemEntity) -> Unit, onNavigate: (SidebarDestination) ->
     }
 
     Box(Modifier.fillMaxSize()) {
-        HeroBackdrop(hero?.backdropUrls.orEmpty(), state.brandColor(hero?.providerId))
+        HeroBackdrop(
+            hero?.backdropUrls.orEmpty(),
+            state.brandColor(hero?.providerId),
+            // Tablet: het hoofdbeeld scrolt mee weg (zoals Netflix); op TV staat het vast.
+            modifier = if (!touch) Modifier else Modifier.graphicsLayer {
+                alpha = if (listState.firstVisibleItemIndex > 0) 0f
+                else (1f - listState.firstVisibleItemScrollOffset / 700f).coerceIn(0f, 1f)
+            },
+        )
+
+        @Composable
+        fun HeroBlock(modifier: Modifier) {
+            if (hero == null) return
+            HeroInfo(
+                title = hero.title,
+                logoUrl = hero.logoUrl,
+                description = hero.description,
+                providerLabel = state.providerNames[hero.providerId],
+                // Vaste hoogte (rijen springen niet bij elke focuswissel), maar zonder lege band eronder.
+                modifier = modifier.padding(start = 56.dp, top = 12.dp, bottom = 8.dp).height(184.dp),
+                descriptionLines = 2,
+            )
+        }
 
         Column(
             Modifier
@@ -150,20 +176,18 @@ fun HomeScreen(onOpen: (ItemEntity) -> Unit, onNavigate: (SidebarDestination) ->
                     )
                 }
                 Spacer(Modifier.weight(1f))
-                Text("◀  menu", style = MaterialTheme.typography.labelMedium, color = ZapperColors.TextSecondary)
-            }
-
-            if (hero != null) {
-                HeroInfo(
-                    title = hero.title,
-                    logoUrl = hero.logoUrl,
-                    description = hero.description,
-                    providerLabel = state.providerNames[hero.providerId],
-                    // Vaste hoogte (rijen springen niet bij elke focuswissel), maar zonder lege band eronder.
-                    modifier = Modifier.padding(start = 56.dp, top = 12.dp, bottom = 8.dp).height(184.dp),
-                    descriptionLines = 2,
+                Text(
+                    if (touch) "☰  menu" else "◀  menu",
+                    style = if (touch) MaterialTheme.typography.titleMedium else MaterialTheme.typography.labelMedium,
+                    color = ZapperColors.TextSecondary,
+                    // Tablet: tikken opent het menu (op TV opent ◀ op de linkerrand het).
+                    modifier = Modifier
+                        .touchClickable { sidebarOpen = true }
+                        .padding(horizontal = 8.dp, vertical = 6.dp),
                 )
             }
+
+            if (!touch) HeroBlock(Modifier)
 
             if (!state.loading && state.rows.isEmpty()) {
                 EmptyState { onNavigate(SidebarDestination.SETTINGS) }
@@ -176,6 +200,10 @@ fun HomeScreen(onOpen: (ItemEntity) -> Unit, onNavigate: (SidebarDestination) ->
                 verticalArrangement = Arrangement.spacedBy(20.dp),
                 modifier = Modifier.weight(1f),
             ) {
+                if (touch && hero != null) {
+                    // Tablet: hoofdbeeld als eerste item; tik opent het programma.
+                    item(key = "hero") { HeroBlock(Modifier.touchClickable { activate(hero) }) }
+                }
                 itemsIndexed(state.rows, key = { _, row -> row.id }) { rowIndex, row ->
                     val ownRowState = rememberLazyListState()
                     Column {
@@ -183,7 +211,7 @@ fun HomeScreen(onOpen: (ItemEntity) -> Unit, onNavigate: (SidebarDestination) ->
                             Text(row.title, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onBackground)
                             if (row.id == "continue" && row.tiles.any { it.removable }) {
                                 Text(
-                                    "   houd OK ingedrukt om te verwijderen",
+                                    if (touch) "   houd ingedrukt om te verwijderen" else "   houd OK ingedrukt om te verwijderen",
                                     style = MaterialTheme.typography.labelMedium,
                                     color = ZapperColors.TextSecondary,
                                     modifier = Modifier.padding(bottom = 3.dp),

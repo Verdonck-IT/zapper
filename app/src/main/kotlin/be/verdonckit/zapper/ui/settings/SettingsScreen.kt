@@ -25,7 +25,14 @@ import be.verdonckit.zapper.ui.components.requestFocusAfterLayout
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -44,9 +51,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.tv.material3.Button
+import be.verdonckit.zapper.ui.components.Button
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.OutlinedButton
+import be.verdonckit.zapper.ui.components.OutlinedButton
 import androidx.tv.material3.Text
 import be.verdonckit.zapper.api.LoginMethod
 import be.verdonckit.zapper.graph
@@ -296,9 +303,16 @@ private fun LoginForm(initialUser: String, onSubmit: (String, String) -> Unit) {
     var user by remember { mutableStateOf(initialUser) }
     var pass by remember { mutableStateOf("") }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        TvTextField(user, { user = it }, "E-mailadres", KeyboardType.Email, password = false)
-        TvTextField(pass, { pass = it }, "Wachtwoord", KeyboardType.Password, password = true)
-        Button(onClick = { onSubmit(user, pass) }, enabled = user.isNotBlank() && pass.isNotBlank()) { Text("Inloggen") }
+    val passFocus = remember { FocusRequester() }
+    val canSubmit = user.isNotBlank() && pass.isNotBlank()
+    fun submit() { if (canSubmit) onSubmit(user, pass) }
+        // Enter (of "volgende" op het schermtoetsenbord) springt naar het wachtwoord; daar logt Enter in.
+        TvTextField(user, { user = it }, "E-mailadres", KeyboardType.Email, password = false, imeAction = ImeAction.Next, onIme = { passFocus.requestFocus() })
+        TvTextField(
+            pass, { pass = it }, "Wachtwoord", KeyboardType.Password, password = true,
+            imeAction = ImeAction.Done, onIme = ::submit, modifier = Modifier.focusRequester(passFocus),
+        )
+        Button(onClick = ::submit, enabled = canSubmit) { Text("Inloggen") }
     }
 }
 
@@ -310,6 +324,9 @@ private fun TvTextField(
     label: String,
     keyboardType: KeyboardType,
     password: Boolean,
+    imeAction: ImeAction = ImeAction.Default,
+    onIme: () -> Unit = {},
+    modifier: Modifier = Modifier,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
@@ -328,9 +345,17 @@ private fun TvTextField(
                 interactionSource = interaction,
                 textStyle = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
                 cursorBrush = SolidColor(Color.White),
-                keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+                keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = imeAction),
+                keyboardActions = KeyboardActions { onIme() },
                 visualTransformation = if (password) PasswordVisualTransformation() else VisualTransformation.None,
-                modifier = Modifier.fillMaxWidth(),
+                modifier = modifier
+                    .fillMaxWidth()
+                    // Fysiek toetsenbord (tablet, emulator): Enter doet hetzelfde als de IME-actie.
+                    .onPreviewKeyEvent { e ->
+                        val enter = e.key == Key.Enter || e.key == Key.NumPadEnter
+                        if (enter && e.type == KeyEventType.KeyUp) onIme()
+                        enter
+                    },
             )
         }
     }

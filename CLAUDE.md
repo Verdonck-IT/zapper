@@ -83,6 +83,14 @@ Klaar:
   nu naar /zoeken/. Catalogus per genre/type via GraphQL `pageSearch(input: {facets, mediaType: video})` → tabblad met
   `tileContentType` "program", bladeren met `after` in dezelfde query. Kodi-add-on had nog geen fix (laatste commit 30/08/2026).
   Op emulator: VRT-sync 1080 programma's (was 15).
+- Tablet/aanraking (10/11/2026): `ui/components/Touch.kt` (`touchClickable`, Button-wrappers, `isTouchDevice`),
+  ☰-menuknop, tik op de scrim sluit de sidebar, aanraking telt voor de screensaver. Getest op emulator
+  (Medium Phone + Medium Tablet): menu, knoppen, Live tv-kaart → player, startscherm met kaarten (swipen, hoofdbeeld
+  scrolt mee), ←-knop op elk scherm, player-balk (← + titel, ⟲10/10⟳). Login: Enter → wachtwoord getest; Enter in het
+  wachtwoordveld (= inloggen) niet met echte gegevens getest.
+- Volgende aflevering (10/11/2026): `pickNextUp()` negeert een platformhint vóór de verst bekeken aflevering;
+  alles bekeken → `NextUpKind.FINISHED` ("Opnieuw bekijken", focus op laatst bekeken aflevering). Unit tests
+  `NextUpTest`; op de tablet-emulator met "De Slimste Mens ter Wereld" (Play): "Opnieuw bekijken", focus op S24-A21.
 
 Geverifieerd: provider-api + VRT-plugin + testkit compileren (Kotlin 2.1); cookie-jar; ECDSA-signatuur Python→Java;
 `./gradlew :app:assembleDebug` slaagt (21/10/2026, zonder compileerfouten of -waarschuwingen) en `./gradlew test` is groen.

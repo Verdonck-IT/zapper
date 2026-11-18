@@ -134,6 +134,25 @@ Voor platformen met `syncsProgress` is het platform de bron van waarheid ("Verde
 afleveringen). Lokale voortgang die recenter is dan 6 uur gaat voor, zodat wat je net in Zapper keek
 meteen klopt, ook als het platform nog achterloopt. Zie `app/.../data/ProgressSync.kt`.
 
+De volgende aflevering op de detailpagina komt uit `pickNextUp()` (`ui/detail/DetailViewModel.kt`,
+getest in `NextUpTest`): recente lokale voortgang → hint uit "Verder kijken" van het platform, maar enkel
+als die niet vóór de verst bekeken aflevering ligt → hervatten of de aflevering na de verst bekeken →
+`FINISHED` als alles bekeken is. Bij `FINISHED` start "Opnieuw bekijken" bij aflevering 1 en gaat de focus
+naar de laatst bekeken aflevering in plaats van naar de afspeelknop.
+
+## Aanraking (tablet)
+
+tv-material 1.0.0 (`Card`, `Surface`, `Button`) reageert enkel op de OK-toets, niet op aanraking.
+`ui/components/Touch.kt` voegt `Modifier.touchClickable` toe (tik + lang indrukken) en eigen `Button`/
+`OutlinedButton`-wrappers met dezelfde naam: gebruik in schermen altijd die uit `ui.components`, niet
+`androidx.tv.material3.Button`. Nieuwe klikbare tv-material-elementen krijgen `touchClickable` mee.
+`isTouchDevice()` (FEATURE_TOUCHSCREEN) wisselt hints ("☰ menu" i.p.v. "◀ menu").
+`IdleController.handleTouch` laat aanraking meetellen als activiteit en sluit de screensaver met een tik.
+Enkel op touch-toestellen: `TouchBackButton` linksboven op elk scherm behalve home (in `AppNav`, niet focusbaar);
+het hoofdbeeld van het startscherm is het eerste lijstitem en scrolt mee weg; de player krijgt een balk met ← en
+titel (zichtbaar met de bediening), ⟲10/10⟳-knoppen en grotere middenknoppen. Loginvelden: Enter/IME-actie
+Next → wachtwoord, Done → inloggen (ook via een fysiek toetsenbord).
+
 ## Veiligheid
 
 - `plugins/index.json` is ECDSA-P256-gesigneerd; elke plugin-jar heeft een sha256 in die index.

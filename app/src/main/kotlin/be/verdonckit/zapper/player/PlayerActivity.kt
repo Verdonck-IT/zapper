@@ -116,8 +116,9 @@ class PlayerActivity : ComponentActivity() {
         playerView = PlayerView(this).apply {
             // Scherm aan/uit regelt IdleController: aan tijdens afspelen, gepauzeerd na een tijd screensaver en slaap.
             // Geen +/- knoppen: spoelen gebeurt met ◀ / ▶ op de afstandsbediening.
-            setShowRewindButton(false)
-            setShowFastForwardButton(false)
+            // Tablet: ⟲10 / 10⟳ naast pauze zoals Netflix (de stap staat op de ExoPlayer: 10 s).
+            setShowRewindButton(isTouch)
+            setShowFastForwardButton(isTouch)
             setShowPreviousButton(false)
             setShowNextButton(false)
             setShowSubtitleButton(true)
@@ -159,9 +160,16 @@ class PlayerActivity : ComponentActivity() {
                 marginEnd = (8 * dp).toInt()
             },
         )
+        val topBar = if (isTouch) touchTopBar(dp) else null
+        if (isTouch) {
+            // Grotere knoppen in het midden, makkelijk te raken met de duim.
+            playerView.findViewById<View>(Media3R.id.exo_center_controls)?.apply { scaleX = 1.6f; scaleY = 1.6f }
+            playerView.setControllerVisibilityListener(PlayerView.ControllerVisibilityListener { v -> topBar?.visibility = v })
+        }
         setContentView(FrameLayout(this).apply {
             setBackgroundColor(0xFF000000.toInt())
             addView(playerView, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
+            topBar?.let { addView(it, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP)) }
             addView(message, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
             addView(
                 seekLabel,
@@ -170,6 +178,41 @@ class PlayerActivity : ComponentActivity() {
         })
         message.text = "Laden: $title"
         start()
+    }
+
+    private val isTouch by lazy { packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_TOUCHSCREEN) }
+
+    /** Tablet: balk bovenaan met ← (terug) en de titel, zichtbaar samen met de bediening (zoals Netflix). */
+    private fun touchTopBar(dp: Float): View = android.widget.LinearLayout(this).apply {
+        orientation = android.widget.LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        setPadding((12 * dp).toInt(), (12 * dp).toInt(), (24 * dp).toInt(), (28 * dp).toInt())
+        background = GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, intArrayOf(0xB3000000.toInt(), 0x00000000))
+        visibility = View.GONE
+        addView(TextView(context).apply {
+            text = "←"
+            textSize = 30f
+            setTextColor(0xFFFFFFFF.toInt())
+            gravity = Gravity.CENTER
+            contentDescription = "Terug"
+            isFocusable = false
+            val size = (56 * dp).toInt()
+            minWidth = size
+            minHeight = size
+            background = android.graphics.drawable.RippleDrawable(
+                android.content.res.ColorStateList.valueOf(0x33FFFFFF), null,
+                GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(0xFFFFFFFF.toInt()) },
+            )
+            setOnClickListener { finish() }
+        })
+        addView(TextView(context).apply {
+            text = title
+            textSize = 20f
+            setTextColor(0xFFFFFFFF.toInt())
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            setPadding((12 * dp).toInt(), 0, 0, 0)
+        })
     }
 
     private fun start() = lifecycleScope.launch {
@@ -240,7 +283,11 @@ class PlayerActivity : ComponentActivity() {
             )
             .build()
 
-        val exo = ExoPlayer.Builder(this).setMediaSourceFactory(mediaSourceFactory).build()
+        val exo = ExoPlayer.Builder(this)
+            .setMediaSourceFactory(mediaSourceFactory)
+            .setSeekBackIncrementMs(SEEK_STEP_MS)
+            .setSeekForwardIncrementMs(SEEK_STEP_MS)
+            .build()
         applySubtitlePreference(exo, prefs.getBoolean(PREF_SUBS, false))
         exo.addListener(object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
@@ -316,6 +363,10 @@ class PlayerActivity : ComponentActivity() {
         applySubtitlePreference(p, !on)
         flash(if (on) "Ondertitels uit" else "Ondertitels aan")
     }
+
+    // Aanraking (tablet): telt als activiteit; tik tijdens de screensaver sluit die enkel.
+    override fun dispatchTouchEvent(event: android.view.MotionEvent): Boolean =
+        idle.handleTouch(event) || super.dispatchTouchEvent(event)
 
     // ---------- Afstandsbediening ----------
 
@@ -566,6 +617,8 @@ class PlayerActivity : ComponentActivity() {
         private const val EXTRA_FROM_START = "fromStart"
         /** Meer dan dit achter de live-rand: knop "Naar live". */
         private const val BEHIND_LIVE_MS = 10_000L
+        /** ⟲10 / 10⟳ op de tablet. */
+        private const val SEEK_STEP_MS = 10_000L
         private const val PREF_SUBS = "subtitles.enabled"
         private const val PREF_SUBS_LANG = "subtitles.language"
 

@@ -28,9 +28,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.tv.material3.Button
+import be.verdonckit.zapper.ui.components.Button
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.OutlinedButton
+import be.verdonckit.zapper.ui.components.OutlinedButton
 import androidx.tv.material3.Text
 import be.verdonckit.zapper.data.ItemEntity
 import be.verdonckit.zapper.data.WatchState

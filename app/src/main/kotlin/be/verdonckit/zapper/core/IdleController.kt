@@ -7,6 +7,7 @@ import android.os.Looper
 import android.os.SystemClock
 import android.view.Gravity
 import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
@@ -36,6 +37,7 @@ class IdleController(
     private var saver: ScreensaverView? = null
     private var saverSince = 0L
     private var swallowKeyUp = false
+    private var swallowTouch = false
     private var keepOn = false
 
     private val tick = object : Runnable {
@@ -75,6 +77,28 @@ class IdleController(
         }
         if (swallowKeyUp && event.action == KeyEvent.ACTION_UP) {
             swallowKeyUp = false
+            return true
+        }
+        if (!keepOn) setKeepScreenOn(true)
+        return false
+    }
+
+    /**
+     * Aanraking (tablet) telt ook als activiteit. Tik tijdens de screensaver sluit die enkel:
+     * het hele gebaar (tot de vinger loslaat) wordt opgegeten.
+     */
+    fun handleTouch(event: MotionEvent): Boolean {
+        lastInteraction = SystemClock.uptimeMillis()
+        if (saver != null) {
+            if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+                hide()
+                swallowTouch = true
+                setKeepScreenOn(true)
+            }
+            return true
+        }
+        if (swallowTouch) {
+            if (event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL) swallowTouch = false
             return true
         }
         if (!keepOn) setKeepScreenOn(true)

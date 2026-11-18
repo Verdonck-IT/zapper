@@ -2,6 +2,7 @@ package be.verdonckit.zapper
 
 import android.os.Bundle
 import android.view.KeyEvent
+import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import be.verdonckit.zapper.core.IdleController
@@ -22,6 +23,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean = idle.handleKey(event) || super.dispatchKeyEvent(event)
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean = idle.handleTouch(event) || super.dispatchTouchEvent(event)
 
     override fun onResume() {
         super.onResume()

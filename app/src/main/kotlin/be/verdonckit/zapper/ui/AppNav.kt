@@ -2,7 +2,14 @@ package be.verdonckit.zapper.ui
 
 import android.net.Uri
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.ui.unit.dp
+import androidx.navigation.compose.currentBackStackEntryAsState
+import be.verdonckit.zapper.ui.components.TouchBackButton
+import be.verdonckit.zapper.ui.components.isTouchDevice
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -36,44 +43,52 @@ fun AppNav() {
         }
     }
 
-    NavHost(
-        navController = nav,
-        startDestination = "home",
-        modifier = Modifier.fillMaxSize().background(ZapperColors.Background),
-    ) {
-        composable("home") {
-            HomeScreen(
-                onOpen = ::open,
-                onNavigate = { dest ->
-                    when (dest) {
-                        SidebarDestination.HOME -> Unit
-                        SidebarDestination.SEARCH -> nav.navigate("search")
-                        SidebarDestination.LIVE -> nav.navigate("live")
-                        SidebarDestination.MY_LIST -> nav.navigate("mylist")
-                        SidebarDestination.SETTINGS -> nav.navigate("settings")
-                    }
-                },
-            )
+    val touch = isTouchDevice()
+    val route = nav.currentBackStackEntryAsState().value?.destination?.route
+    Box(Modifier.fillMaxSize()) {
+        NavHost(
+            navController = nav,
+            startDestination = "home",
+            modifier = Modifier.fillMaxSize().background(ZapperColors.Background),
+        ) {
+            composable("home") {
+                HomeScreen(
+                    onOpen = ::open,
+                    onNavigate = { dest ->
+                        when (dest) {
+                            SidebarDestination.HOME -> Unit
+                            SidebarDestination.SEARCH -> nav.navigate("search")
+                            SidebarDestination.LIVE -> nav.navigate("live")
+                            SidebarDestination.MY_LIST -> nav.navigate("mylist")
+                            SidebarDestination.SETTINGS -> nav.navigate("settings")
+                        }
+                    },
+                )
+            }
+            composable("detail/{key}") { entry ->
+                DetailScreen(
+                    itemKey = Uri.decode(entry.arguments?.getString("key").orEmpty()),
+                    onOpenEpisode = { itemKey, episode ->
+                        context.graph.episodeSelection["$itemKey|${episode.playableId}"] = episode
+                        nav.navigate("episode/${Uri.encode(itemKey)}/${Uri.encode(episode.playableId)}")
+                    },
+                )
+            }
+            composable("episode/{key}/{playable}") { entry ->
+                EpisodeScreen(
+                    itemKey = Uri.decode(entry.arguments?.getString("key").orEmpty()),
+                    playableId = Uri.decode(entry.arguments?.getString("playable").orEmpty()),
+                    onGone = { nav.popBackStack() },
+                )
+            }
+            composable("live") { LiveScreen(onBack = { nav.popBackStack() }) }
+            composable("mylist") { MyListScreen(onOpen = ::open, onBack = { nav.popBackStack() }) }
+            composable("search") { SearchScreen(onOpen = ::open, onBack = { nav.popBackStack() }) }
+            composable("settings") { SettingsScreen(onBack = { nav.popBackStack() }) }
         }
-        composable("detail/{key}") { entry ->
-            DetailScreen(
-                itemKey = Uri.decode(entry.arguments?.getString("key").orEmpty()),
-                onOpenEpisode = { itemKey, episode ->
-                    context.graph.episodeSelection["$itemKey|${episode.playableId}"] = episode
-                    nav.navigate("episode/${Uri.encode(itemKey)}/${Uri.encode(episode.playableId)}")
-                },
-            )
+        // Tablet: overal behalve op het startscherm (dat heeft ☰) een ←-knop linksboven.
+        if (touch && route != null && route != "home") {
+            TouchBackButton(onClick = { nav.popBackStack() }, modifier = Modifier.statusBarsPadding().padding(start = 6.dp, top = 4.dp))
         }
-        composable("episode/{key}/{playable}") { entry ->
-            EpisodeScreen(
-                itemKey = Uri.decode(entry.arguments?.getString("key").orEmpty()),
-                playableId = Uri.decode(entry.arguments?.getString("playable").orEmpty()),
-                onGone = { nav.popBackStack() },
-            )
-        }
-        composable("live") { LiveScreen(onBack = { nav.popBackStack() }) }
-        composable("mylist") { MyListScreen(onOpen = ::open, onBack = { nav.popBackStack() }) }
-        composable("search") { SearchScreen(onOpen = ::open, onBack = { nav.popBackStack() }) }
-        composable("settings") { SettingsScreen(onBack = { nav.popBackStack() }) }
     }
 }

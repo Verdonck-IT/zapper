@@ -16,11 +16,14 @@ VRT MAX, VTM GO, Play en de live-zenders van Focus en WTV staan samen in één a
 - **Verder kijken zoals op de website** – Zapper volgt wat VRT MAX en Play zelf bijhouden en meldt
   je voortgang terug. Begin je op je gsm, dan kijk je verder op de TV, en omgekeerd.
 - **De volgende aflevering staat klaar** – open een reeks en Zapper selecteert het juiste seizoen en
-  de aflevering waar je zat. Bekeken afleveringen en seizoenen zijn gemarkeerd.
+  de aflevering waar je zat. Bekeken afleveringen en seizoenen zijn gemarkeerd. Een oude, half bekeken
+  aflevering haalt je niet terug als je al verder bent; heb je alles gezien, dan staat er "Alles bekeken"
+  en begint Zapper niet per ongeluk opnieuw bij aflevering 1.
 - **Mijn lijst** – bewaar programma's; de lijst is dezelfde als in de app of op de website van de zender.
 - **Live tv** – alle live-zenders op één pagina, de populairste eerst, met een knop "Naar live" als je achterloopt.
 - **Zoeken en bladeren** – door de volledige catalogus A–Z of per categorie.
 - **Gemaakt voor de afstandsbediening** – spoelen met de pijltjes, ondertitels met één knop.
+- **Ook op een tablet** – alles is aan te tikken; ☰ rechtsboven opent het menu.
 - **Werkt zichzelf bij** – de app en de zenders worden automatisch bijgewerkt.
 
 ## Zenders
@@ -90,6 +93,11 @@ werkende versie.
 | Player | **OK** | pauze / verder |
 | Player | ▼ | naar de ondertitelknop (CC); ◀ daarnaast: **Naar live** |
 | Player | **CC-toets** | ondertitels aan/uit (wordt onthouden) |
+
+Op een tablet tik je gewoon, zoals in de Netflix-app: **☰ menu** rechtsboven opent het menu (tik ernaast om het
+te sluiten), elk ander scherm heeft linksboven een **←**, en lang indrukken op een kaart in Verder kijken opent de opties.
+Tijdens het afspelen toont een tik de bediening: **←** en de titel bovenaan, **⟲10 ▶ 10⟳** in het midden.
+In het loginformulier gaat **Enter** naar het volgende veld en logt Enter in het wachtwoordveld in.
 
 Gebruik je Zapper een tijdje niet, dan verschijnt een donkere, OLED-veilige screensaver
 (na 5 minuten, of na 3 minuten met een gepauzeerde video). Daarna neemt de slaapstand van je TV het over.

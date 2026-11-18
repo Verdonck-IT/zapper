@@ -116,6 +116,7 @@ fun ContentCard(
         modifier = modifier
             .then(if (width > 0.dp) Modifier.width(width) else Modifier.fillMaxWidth())
             .aspectRatio(16f / 9f)
+            .touchClickable(onLongClick = onLongClick, onClick = onClick)
             .onFocusChanged { if (it.isFocused) onFocus() },
         shape = CardDefaults.shape(RoundedCornerShape(6.dp)),
         scale = CardDefaults.scale(focusedScale = 1.08f),

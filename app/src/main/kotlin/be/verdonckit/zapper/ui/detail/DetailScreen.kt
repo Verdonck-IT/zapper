@@ -16,11 +16,14 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
@@ -28,10 +31,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.tv.material3.Button
+import be.verdonckit.zapper.ui.components.Button
 import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.OutlinedButton
+import be.verdonckit.zapper.ui.components.OutlinedButton
 import androidx.tv.material3.Text
 import be.verdonckit.zapper.api.Episode
 import be.verdonckit.zapper.graph
@@ -41,6 +44,9 @@ import be.verdonckit.zapper.ui.components.CardBadge
 import be.verdonckit.zapper.ui.components.ContentCard
 import be.verdonckit.zapper.ui.components.HeroBackdrop
 import be.verdonckit.zapper.ui.components.HeroInfo
+import be.verdonckit.zapper.ui.components.TrackedFocusRequester
+import be.verdonckit.zapper.ui.components.focusRequester
+import be.verdonckit.zapper.ui.components.requestFocusAfterLayout
 import be.verdonckit.zapper.ui.home.HomeViewModel
 import be.verdonckit.zapper.ui.theme.ZapperColors
 
@@ -51,6 +57,12 @@ fun DetailScreen(itemKey: String, onOpenEpisode: (itemKey: String, episode: Epis
     val state by vm.state.collectAsStateWithLifecycle()
     val plugins by context.graph.plugins.plugins.collectAsStateWithLifecycle()
     val playFocus = remember { FocusRequester() }
+    var playFocused by remember { mutableStateOf(false) }
+    // Reeks uitgekeken: de focus gaat naar de laatst bekeken aflevering, niet naar "Afspelen"
+    // (dat zou opnieuw bij aflevering 1 beginnen).
+    val lastWatchedFocus = remember { TrackedFocusRequester() }
+    var lastWatchedFocused by remember { mutableStateOf(false) }
+    val finished = state.nextUp?.kind == NextUpKind.FINISHED
     val episodeRow = rememberLazyListState()
     val item = state.item
     // Terug gaat hier meteen naar het vorige scherm (gewone navigatie), ook vanuit seizoenen of afleveringen.
@@ -82,12 +94,13 @@ fun DetailScreen(itemKey: String, onOpenEpisode: (itemKey: String, episode: Epis
                     item?.playableId != null -> "▶  Afspelen"
                     next?.kind == NextUpKind.RESUME -> "▶  Verder kijken"
                     next?.kind == NextUpKind.NEXT -> "▶  Volgende aflevering"
+                    next?.kind == NextUpKind.FINISHED -> "↺  Opnieuw bekijken"
                     else -> "▶  Afspelen"
                 }
                 Button(
-                    onClick = { target?.let { play(it.first, it.second, next?.episode?.imageUrl) } },
+                    onClick = { target?.let { play(it.first, it.second, next?.playEpisode?.imageUrl) } },
                     enabled = target != null,
-                    modifier = Modifier.focusRequester(playFocus),
+                    modifier = Modifier.focusRequester(playFocus).onFocusChanged { playFocused = it.hasFocus },
                 ) { Text(label) }
 
                 if (vm.supportsMyList()) {
@@ -105,7 +118,7 @@ fun DetailScreen(itemKey: String, onOpenEpisode: (itemKey: String, episode: Epis
                 if (next != null && item?.playableId == null) {
                     val w = state.watch[next.episode.playableId]
                     Text(
-                        listOfNotNull(
+                        if (next.kind == NextUpKind.FINISHED) "✓  Alles bekeken" else listOfNotNull(
                             HomeViewModel.episodeLabel(next.episode.seasonNumber, next.episode.episodeNumber, next.episode.title),
                             w?.takeIf { it.inProgress }?.let { HomeViewModel.remaining(it.positionMs, it.durationMs) },
                         ).joinToString(" · "),
@@ -157,6 +170,13 @@ fun DetailScreen(itemKey: String, onOpenEpisode: (itemKey: String, episode: Epis
                 val nextIndex = state.nextUp?.takeIf { it.seasonIndex == state.selectedSeason }
                     ?.let { n -> episodes.indexOfFirst { it.playableId == n.episode.playableId } }?.takeIf { it >= 0 }
                 LaunchedEffect(state.selectedSeason, nextIndex) { episodeRow.scrollToItem(nextIndex ?: 0) }
+                LaunchedEffect(finished, nextIndex) {
+                    // Enkel overnemen als de focus nog op "Afspelen" staat (niet als je al aan het navigeren bent).
+                    if (finished && nextIndex != null && playFocused) {
+                        episodeRow.scrollToItem(nextIndex)
+                        lastWatchedFocus.requester.requestFocusAfterLayout { lastWatchedFocused }
+                    }
+                }
                 LazyRow(
                     state = episodeRow,
                     contentPadding = PaddingValues(start = 56.dp, end = 56.dp, top = 8.dp, bottom = 24.dp),
@@ -167,8 +187,10 @@ fun DetailScreen(itemKey: String, onOpenEpisode: (itemKey: String, episode: Epis
                         EpisodeCard(
                             ep = ep,
                             state = state,
-                            isNext = index == nextIndex,
+                            isNext = index == nextIndex && !finished,
                             brand = brand,
+                            modifier = if (finished && index == nextIndex) Modifier.focusRequester(lastWatchedFocus) else Modifier,
+                            onFocus = { lastWatchedFocused = finished && index == nextIndex },
                             onClick = { item?.let { onOpenEpisode(it.key, ep) } },
                         )
                     }
@@ -188,7 +210,15 @@ fun DetailScreen(itemKey: String, onOpenEpisode: (itemKey: String, episode: Epis
 }
 
 @Composable
-private fun EpisodeCard(ep: Episode, state: DetailState, isNext: Boolean, brand: Color, onClick: () -> Unit) {
+private fun EpisodeCard(
+    ep: Episode,
+    state: DetailState,
+    isNext: Boolean,
+    brand: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    onFocus: () -> Unit = {},
+) {
     val item = state.item
     val w = state.watch[ep.playableId]
     Column(Modifier.width(260.dp)) {
@@ -212,7 +242,8 @@ private fun EpisodeCard(ep: Episode, state: DetailState, isNext: Boolean, brand:
                 else -> null
             },
             onClick = onClick,
-            onFocus = {},
+            onFocus = onFocus,
+            modifier = modifier,
         )
         val meta = listOfNotNull(
             w?.takeIf { it.inProgress }?.let { HomeViewModel.remaining(it.positionMs, it.durationMs) },

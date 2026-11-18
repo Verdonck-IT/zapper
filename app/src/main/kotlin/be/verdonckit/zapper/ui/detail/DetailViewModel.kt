@@ -44,9 +44,56 @@ data class SeasonUi(
     val fullyWatched: Boolean get() = total > 0 && watchedCount >= total
 }
 
-enum class NextUpKind { RESUME, NEXT, START }
+/** FINISHED: alles tot de laatste beschikbare aflevering is bekeken. */
+enum class NextUpKind { RESUME, NEXT, START, FINISHED }
 
-data class NextUp(val episode: Episode, val seasonIndex: Int, val kind: NextUpKind)
+/**
+ * [episode] staat in de kijkvolgorde vooraan (bij FINISHED: de laatst bekeken aflevering);
+ * [playEpisode] is wat "Afspelen" start (bij FINISHED: opnieuw vanaf de eerste aflevering).
+ */
+data class NextUp(val episode: Episode, val seasonIndex: Int, val kind: NextUpKind, val playEpisode: Episode = episode)
+
+/**
+ * Volgende aflevering, in deze volgorde:
+ * 1. [recentLocalId]: wat je net in Zapper keek (recenter dan [ProgressSync.LOCAL_WINS_MS]), ook een oudere aflevering;
+ * 2. [remoteHint] uit de "Verder kijken"-lijst van het platform, maar enkel als je nog niet verder bent:
+ *    een oude, half bekeken aflevering mag niet winnen van nieuwere die je al keek;
+ * 3. de verst bekeken aflevering in volgorde: hervatten, of de aflevering erna;
+ * 4. alles bekeken: FINISHED (niet stilletjes terug naar aflevering 1);
+ * 5. niets bekeken: de eerste beschikbare aflevering.
+ *
+ * [order] = (seizoenindex, aflevering) in kijkvolgorde.
+ */
+fun pickNextUp(
+    order: List<Pair<Int, Episode>>,
+    watch: Map<String, WatchState>,
+    recentLocalId: String? = null,
+    remoteHint: String? = null,
+): NextUp? {
+    if (order.isEmpty()) return null
+    fun indexOf(playableId: String) = order.indexOfFirst { it.second.playableId == playableId }.takeIf { it >= 0 }
+    fun at(i: Int, kind: NextUpKind) = NextUp(order[i].second, order[i].first, kind)
+    fun after(i: Int): NextUp? =
+        (i + 1 until order.size).firstOrNull { order[it].second.available }?.let { at(it, NextUpKind.NEXT) }
+    fun from(i: Int): NextUp? {
+        val w = watch[order[i].second.playableId]
+        return if (w?.watched == true) after(i) else at(i, if (w?.started == true) NextUpKind.RESUME else NextUpKind.NEXT)
+    }
+
+    recentLocalId?.let(::indexOf)?.let { i -> from(i)?.let { return it } }
+
+    // Verst bekeken aflevering: alles daarvoor is verleden tijd.
+    val frontier = order.indices.lastOrNull { watch[order[it].second.playableId]?.started == true }
+
+    remoteHint?.let(::indexOf)?.takeIf { frontier == null || it >= frontier }?.let { i -> from(i)?.let { return it } }
+
+    val firstAvailable = order.indices.firstOrNull { order[it].second.available } ?: return null
+    if (frontier != null) {
+        from(frontier)?.let { return it }
+        return at(frontier, NextUpKind.FINISHED).copy(playEpisode = order[firstAvailable].second)
+    }
+    return at(firstAvailable, NextUpKind.START)
+}
 
 data class DetailState(
     val item: ItemEntity? = null,
@@ -232,35 +279,10 @@ class DetailViewModel(private val graph: AppGraph, itemKey: String) : ViewModel(
         }
     }
 
-    /**
-     * Volgende aflevering, in deze volgorde:
-     * 1. wat je net in Zapper keek (lokaal, recenter dan [ProgressSync.LOCAL_WINS_MS]);
-     * 2. de "Verder kijken"-lijst van het platform;
-     * 3. de laatst bekeken aflevering in volgorde: hervatten, of de aflevering erna;
-     * 4. de eerste beschikbare aflevering.
-     */
     private fun nextUp(seasons: List<SeasonUi>, watch: Map<String, WatchState>): NextUp? {
-        val order = playOrder(seasons)
-        if (order.isEmpty()) return null
-        fun indexOf(playableId: String) = order.indexOfFirst { it.second.playableId == playableId }
-        fun at(i: Int, kind: NextUpKind) = order.getOrNull(i)?.let { NextUp(it.second, it.first, kind) }
-        fun after(i: Int): NextUp? =
-            (i + 1 until order.size).firstOrNull { order[it].second.available }?.let { at(it, NextUpKind.NEXT) }
-        fun from(i: Int): NextUp? {
-            val w = watch[order[i].second.playableId]
-            return if (w?.watched == true) after(i) else at(i, if (w?.started == true) NextUpKind.RESUME else NextUpKind.NEXT)
-        }
-
         val now = System.currentTimeMillis()
-        local.values.filter { now - it.updatedAt < ProgressSync.LOCAL_WINS_MS }.maxByOrNull { it.updatedAt }
-            ?.let { indexOf(it.playableId) }?.takeIf { it >= 0 }?.let { i -> from(i)?.let { return it } }
-
-        remoteHint?.let { indexOf(it) }?.takeIf { it >= 0 }?.let { i -> from(i)?.let { return it } }
-
-        val lastStarted = order.indices.lastOrNull { watch[order[it].second.playableId]?.started == true }
-        if (lastStarted != null) from(lastStarted)?.let { return it }
-
-        return order.indices.firstOrNull { order[it].second.available }?.let { at(it, NextUpKind.START) }
+        val recentLocal = local.values.filter { now - it.updatedAt < ProgressSync.LOCAL_WINS_MS }.maxByOrNull { it.updatedAt }
+        return pickNextUp(playOrder(seasons), watch, recentLocal?.playableId, remoteHint)
     }
 
     /** (seizoenindex, aflevering) in kijkvolgorde: seizoen- en afleveringsnummer als die er zijn, anders de lijstvolgorde. */
@@ -292,7 +314,7 @@ class DetailViewModel(private val graph: AppGraph, itemKey: String) : ViewModel(
         val s = _state.value
         val item = s.item ?: return null
         item.playableId?.let { return it to item.title }
-        val ep = s.nextUp?.episode ?: return null
+        val ep = s.nextUp?.playEpisode ?: return null
         return ep.playableId to playTitle(item.title, ep.title)
     }
 
