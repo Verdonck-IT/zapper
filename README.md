@@ -96,7 +96,7 @@ werkende versie.
 
 Op een tablet tik je gewoon, zoals in de Netflix-app: **☰ menu** rechtsboven opent het menu (tik ernaast om het
 te sluiten), elk ander scherm heeft linksboven een **←**, en lang indrukken op een kaart in Verder kijken opent de opties.
-Tijdens het afspelen toont een tik de bediening: **←** en de titel bovenaan, **⟲10 ▶ 10⟳** in het midden.
+Video speelt volledig scherm (veeg vanaf de rand om de Android-balken even te tonen); een tik toont de bediening: **←** en de titel bovenaan, **⟲10 ▶ 10⟳** in het midden.
 In het loginformulier gaat **Enter** naar het volgende veld en logt Enter in het wachtwoordveld in.
 
 Gebruik je Zapper een tijdje niet, dan verschijnt een donkere, OLED-veilige screensaver

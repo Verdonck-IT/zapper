@@ -244,9 +244,10 @@ class PlayProvider : StreamingProvider {
             format = StreamFormat.HLS
         }
         if (manifest == null && data.str("adType") == "SSAI") {
-            // Server-side reclame (Google DAI): het manifest met reclame komt van pubads.
+            // Server-side reclame (Google DAI). Zelfde API op dai.google.com als op pubads.g.doubleclick.net, maar
+            // adblockers (DNS-filters, VPN-blockers) blokkeren pubads vaak en dai.google.com niet.
             val ssai = data.obj("ssai") ?: throw ProviderException(ErrorKind.API_CHANGED, "Play: SSAI zonder gegevens")
-            val url = "https://pubads.g.doubleclick.net/ondemand/dash/content/${ssai.str("contentSourceID")}/vid/${ssai.str("videoID")}/streams"
+            val url = "https://$DAI_HOST/ondemand/dash/content/${ssai.str("contentSourceID")}/vid/${ssai.str("videoID")}/streams"
             val resp = host.http.execute(HttpRequest(url, "POST", body = ByteArray(0)))
             manifest = runCatching { JSONObject(resp.text()).str("stream_manifest") }.getOrNull()
             format = StreamFormat.DASH
@@ -370,6 +371,8 @@ class PlayProvider : StreamingProvider {
         private const val RESUME_MARGIN = 30
         private const val TITLES_KEY = "programs.byTitle"
         private const val LICENSE_URL = "https://widevine.keyos.com/api/v4/getLicense"
+        /** Google DAI (server-side reclame); niet pubads.g.doubleclick.net, dat adblockers tegenhouden. */
+        internal const val DAI_HOST = "dai.google.com"
         private val EXCLUDED_BRANDS = setOf("kinepolis")
         private val POPULAR_TITLE = Regex("moet je zien|top ?10|populair|10 om", RegexOption.IGNORE_CASE)
         private val CONTINUE_TITLE = Regex("kijk verder|verder kijken", RegexOption.IGNORE_CASE)

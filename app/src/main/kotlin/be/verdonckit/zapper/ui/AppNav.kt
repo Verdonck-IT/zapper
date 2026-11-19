@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.currentBackStackEntryAsState
 import be.verdonckit.zapper.ui.components.TouchBackButton
@@ -88,7 +87,7 @@ fun AppNav() {
         }
         // Tablet: overal behalve op het startscherm (dat heeft ☰) een ←-knop linksboven.
         if (touch && route != null && route != "home") {
-            TouchBackButton(onClick = { nav.popBackStack() }, modifier = Modifier.statusBarsPadding().padding(start = 6.dp, top = 4.dp))
+            TouchBackButton(onClick = { nav.popBackStack() }, modifier = Modifier.padding(start = 6.dp, top = 8.dp))
         }
     }
 }

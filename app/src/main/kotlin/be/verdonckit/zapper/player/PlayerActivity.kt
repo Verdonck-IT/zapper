@@ -11,6 +11,7 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.activity.ComponentActivity
+import androidx.activity.enableEdgeToEdge
 import androidx.annotation.OptIn
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.C
@@ -98,6 +99,25 @@ class PlayerActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         idle.start()
+        enterImmersive()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        // Na een dialoog, meldingenpaneel of app-wissel komen de systeembalken terug: opnieuw verbergen.
+        if (hasFocus) enterImmersive()
+    }
+
+    /**
+     * Volledig scherm zoals Netflix: geen statusbalk, navigatieknoppen of (Samsung-)taakbalk over de video.
+     * Een veeg vanaf de rand toont ze even; daarna verdwijnen ze vanzelf. Op TV is er niets te verbergen.
+     */
+    private fun enterImmersive() {
+        // Edge-to-edge staat aan (enableEdgeToEdge in onCreate); hier enkel de balken verbergen.
+        androidx.core.view.WindowCompat.getInsetsController(window, window.decorView).apply {
+            systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+        }
     }
 
     override fun onPause() {
@@ -112,6 +132,10 @@ class PlayerActivity : ComponentActivity() {
     private val hideSeekLabel = Runnable { seekLabel.visibility = View.GONE }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge(
+            statusBarStyle = androidx.activity.SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = androidx.activity.SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+        )
         super.onCreate(savedInstanceState)
         playerView = PlayerView(this).apply {
             // Scherm aan/uit regelt IdleController: aan tijdens afspelen, gepauzeerd na een tijd screensaver en slaap.
@@ -168,6 +192,12 @@ class PlayerActivity : ComponentActivity() {
         }
         setContentView(FrameLayout(this).apply {
             setBackgroundColor(0xFF000000.toInt())
+            // Bediening nooit onder een camera-uitsparing (gsm); de balken zelf zijn verborgen.
+            androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(this) { v, insets ->
+                val cut = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.displayCutout())
+                v.setPadding(cut.left, cut.top, cut.right, cut.bottom)
+                insets
+            }
             addView(playerView, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))
             topBar?.let { addView(it, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.TOP)) }
             addView(message, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT))

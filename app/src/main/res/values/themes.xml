@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
     <style name="Theme.Zapper" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@android:color/black</item>
         <item name="android:colorBackground">@android:color/black</item>
     </style>
 
+    <!-- Volledig scherm regelt PlayerActivity zelf (enableEdgeToEdge + systeembalken verbergen);
+         windowFullscreen is verouderd en verbergt de navigatie/taakbalk niet. -->
     <style name="Theme.Zapper.Player" parent="Theme.Zapper">
-        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowLayoutInDisplayCutoutMode" tools:targetApi="27">shortEdges</item>
     </style>
 </resources>

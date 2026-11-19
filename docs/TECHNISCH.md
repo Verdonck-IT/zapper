@@ -153,6 +153,12 @@ het hoofdbeeld van het startscherm is het eerste lijstitem en scrolt mee weg; de
 titel (zichtbaar met de bediening), ⟲10/10⟳-knoppen en grotere middenknoppen. Loginvelden: Enter/IME-actie
 Next → wachtwoord, Done → inloggen (ook via een fysiek toetsenbord).
 
+Edge-to-edge (verplicht vanaf targetSdk 35/36): beide activities roepen `enableEdgeToEdge()` aan (transparante balken,
+lichte iconen). `MainActivity` legt `WindowInsets.safeDrawing` als padding rond de hele UI, zodat niets onder de
+statusbalk of de Samsung-taakbalk valt. `PlayerActivity` verbergt de systeembalken met `WindowInsetsControllerCompat`
+(`BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE`; opnieuw in `onResume`/`onWindowFocusChanged`) en houdt enkel een
+camera-uitsparing vrij. `windowFullscreen` in het thema is weg (verouderd, verbergt de navigatiebalk niet).
+
 ## Veiligheid
 
 - `plugins/index.json` is ECDSA-P256-gesigneerd; elke plugin-jar heeft een sha256 in die index.

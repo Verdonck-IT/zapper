@@ -88,6 +88,8 @@ Klaar:
   (Medium Phone + Medium Tablet): menu, knoppen, Live tv-kaart → player, startscherm met kaarten (swipen, hoofdbeeld
   scrolt mee), ←-knop op elk scherm, player-balk (← + titel, ⟲10/10⟳). Login: Enter → wachtwoord getest; Enter in het
   wachtwoordveld (= inloggen) niet met echte gegevens getest.
+  Edge-to-edge (19/11/2026): `enableEdgeToEdge()` + `safeDrawing` in de app, immersieve player (systeembalken verborgen,
+  veeg toont ze even). Getest op een Galaxy Tab S8+ (SM-X800, Samsung-taakbalk) met de debug-build: Focus live.
 - Volgende aflevering (10/11/2026): `pickNextUp()` negeert een platformhint vóór de verst bekeken aflevering;
   alles bekeken → `NextUpKind.FINISHED` ("Opnieuw bekijken", focus op laatst bekeken aflevering). Unit tests
   `NextUpTest`; op de tablet-emulator met "De Slimste Mens ter Wereld" (Play): "Opnieuw bekijken", focus op S24-A21.
